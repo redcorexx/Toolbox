@@ -5,6 +5,13 @@
      • MyMemory  — API رایگان https://mymemory.translated.net/doc/spec.php
    ============================================================ */
 
+import {
+  ProviderError,
+  hasActiveKey,
+  providerTranslate,
+  type ApiSettings,
+} from "./providers";
+
 export type UiLangCode = "fa" | "en";
 
 export interface Lang {
@@ -59,8 +66,8 @@ export const toFa = (value: string | number): string =>
 
 /* ---------------- موتورهای ترجمه ---------------- */
 
-export type Engine = "google" | "mymemory" | "auto";
-export type EngineUsed = "google" | "mymemory";
+export type Engine = "google" | "mymemory" | "custom" | "auto";
+export type EngineUsed = "google" | "mymemory" | "custom";
 
 export interface EngineInfo {
   id: Engine;
@@ -82,12 +89,20 @@ export const ENGINES: EngineInfo[] = [
   {
     id: "auto",
     label: { fa: "خودکار", en: "Auto" },
-    desc: { fa: "اول گوگل؛ اگر نشد، MyMemory", en: "Google first, MyMemory fallback" },
+    desc: { fa: "کلید تو ← گوگل ← MyMemory", en: "Your key → Google → MyMemory" },
+  },
+  {
+    id: "custom",
+    label: { fa: "کلید اختصاصی", en: "Your API key" },
+    desc: { fa: "OpenAI، Gemini، Groq و…", en: "OpenAI, Gemini, Groq…" },
   },
 ];
 
-export const engineName = (e: EngineUsed, lang: UiLangCode = "fa"): string =>
-  e === "google" ? (lang === "fa" ? "گوگل" : "Google") : "MyMemory";
+export const engineName = (e: EngineUsed, lang: UiLangCode = "fa", providerName?: string): string => {
+  if (e === "google") return lang === "fa" ? "گوگل" : "Google";
+  if (e === "mymemory") return "MyMemory";
+  return providerName ?? (lang === "fa" ? "مدل اختصاصی" : "Custom model");
+};
 
 /* ---------------- تشخیص زبان (بر اساس خط نوشتاری) ---------------- */
 
@@ -353,10 +368,14 @@ export interface TranslateResult {
 export interface TranslateOptions {
   engine?: Engine;
   email?: string;
+  /** تنظیمات کلید اختصاصی (برای موتور custom و حالت auto) */
+  api?: ApiSettings;
   signal?: AbortSignal;
   onProgress?: (done: number, total: number) => void;
   onFallback?: (failed: EngineUsed) => void;
 }
+
+const CUSTOM_CHUNK = 3500;
 
 async function runEngine(
   engine: EngineUsed,
@@ -365,7 +384,9 @@ async function runEngine(
   tgt: string,
   opts: TranslateOptions
 ): Promise<TranslateResult> {
-  const parts = chunkText(text, engine === "google" ? GOOGLE_CHUNK : MYMEMORY_CHUNK);
+  const chunkSize =
+    engine === "google" ? GOOGLE_CHUNK : engine === "custom" ? CUSTOM_CHUNK : MYMEMORY_CHUNK;
+  const parts = chunkText(text, chunkSize);
   const total = parts.filter((p) => !/^\n+$/.test(p)).length || 1;
   opts.onProgress?.(0, total);
 
@@ -380,10 +401,16 @@ async function runEngine(
       outParts.push(p);
       continue;
     }
-    const r =
-      engine === "google"
-        ? await googleChunk(p, src === "auto" ? "auto" : src, tgt, opts.signal)
-        : await myMemoryChunk(p, guessed, tgt, opts.email || undefined, opts.signal);
+    let r: ChunkOut;
+    if (engine === "google") {
+      r = await googleChunk(p, src === "auto" ? "auto" : src, tgt, opts.signal);
+    } else if (engine === "custom") {
+      if (!opts.api || !hasActiveKey(opts.api)) throw new ProviderError("unauthorized");
+      const out = await providerTranslate(opts.api, p, src, tgt, opts.signal);
+      r = { text: out, detected: guessed, alternatives: [] };
+    } else {
+      r = await myMemoryChunk(p, guessed, tgt, opts.email || undefined, opts.signal);
+    }
 
     if (!detected && r.detected && r.detected !== "auto") detected = r.detected;
     if (done === 0) firstAlternatives = r.alternatives;
@@ -429,13 +456,21 @@ export async function translateText(
   const engine = opts.engine ?? "google";
   if (engine !== "auto") return runEngine(engine, text, src, tgt, opts);
 
-  try {
-    return await runEngine("google", text, src, tgt, opts);
-  } catch (e) {
-    if (isAbort(e)) throw e;
-    opts.onFallback?.("google");
-    return runEngine("mymemory", text, src, tgt, opts);
+  // حالت خودکار: کلید اختصاصی (اگر باشد) ← گوگل ← MyMemory
+  const order: EngineUsed[] =
+    opts.api && hasActiveKey(opts.api) ? ["custom", "google", "mymemory"] : ["google", "mymemory"];
+
+  let lastErr: unknown = null;
+  for (let i = 0; i < order.length; i++) {
+    try {
+      return await runEngine(order[i], text, src, tgt, opts);
+    } catch (e) {
+      if (isAbort(e)) throw e;
+      lastErr = e;
+      if (i < order.length - 1) opts.onFallback?.(order[i]);
+    }
   }
+  throw lastErr ?? new TranslateError("generic");
 }
 
 /* ---------------- گفتار (TTS / STT) ---------------- */
