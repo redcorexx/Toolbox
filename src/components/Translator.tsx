@@ -9,6 +9,7 @@ import {
   Copy,
   Cpu,
   Eraser,
+  FileDown,
   Globe,
   Languages,
   Loader2,
@@ -47,6 +48,7 @@ import {
   type Stats,
 } from "../lib/translator";
 import { useI18n } from "../lib/i18n";
+import { exportTranslationPdf } from "../lib/pdf";
 import { cn } from "../utils/cn";
 
 const MAX_LEN = 5000;
@@ -87,7 +89,8 @@ function EngineIcon({ id, className }: { id: Engine; className?: string }) {
 }
 
 export default function Translator({ notify }: { notify: Notify }) {
-  const { t, n, ln, lang } = useI18n();
+  const i18n = useI18n();
+  const { t, n, ln, lang } = i18n;
 
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
@@ -117,6 +120,7 @@ export default function Translator({ notify }: { notify: Notify }) {
   const [speaking, setSpeaking] = useState<"src" | "tgt" | null>(null);
   const [listening, setListening] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const recRef = useRef<any>(null);
@@ -357,6 +361,26 @@ export default function Translator({ notify }: { notify: Notify }) {
       }
     } catch {
       notify(t("n_clip_denied"), "error");
+    }
+  };
+
+  const exportPdf = async () => {
+    if (!output.trim() || pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      await exportTranslationPdf({
+        sourceText: input,
+        translatedText: output,
+        src: src === "auto" ? detected || detectLang(input) : src,
+        tgt,
+        engine: usedEngine ?? "google",
+        i18n,
+      });
+      notify(t("n_pdf_done"), "success");
+    } catch {
+      notify(t("n_pdf_err"), "error");
+    } finally {
+      setPdfBusy(false);
     }
   };
 
@@ -619,6 +643,19 @@ export default function Translator({ notify }: { notify: Notify }) {
                 )}
               </span>
               <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => void exportPdf()}
+                  disabled={!output.trim() || pdfBusy}
+                  title={t("btn_pdf")}
+                  aria-label={t("btn_pdf")}
+                  className={cn(iconBtn, "h-9 w-9 bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15")}
+                >
+                  {pdfBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileDown className="h-4 w-4" />
+                  )}
+                </button>
                 <button
                   onClick={() => toggleSpeak("tgt")}
                   disabled={!output.trim()}
