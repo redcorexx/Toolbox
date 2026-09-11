@@ -11,10 +11,12 @@ import {
   Eraser,
   FileDown,
   Globe,
+  KeyRound,
   Languages,
   Loader2,
   Mail,
   Mic,
+  Settings2,
   Sparkles,
   Type,
   Volume2,
@@ -23,6 +25,17 @@ import {
 } from "lucide-react";
 import LanguageSelect from "./LanguageSelect";
 import HistoryPanel from "./HistoryPanel";
+import ApiKeyPanel, { providerErrorMessage } from "./ApiKeyPanel";
+import {
+  ProviderError,
+  activeModel,
+  hasActiveKey,
+  loadApiSettings,
+  providerById,
+  saveApiSettings,
+  shortModel,
+  type ApiSettings,
+} from "../lib/providers";
 import {
   ENGINES,
   LANGUAGES,
@@ -73,6 +86,7 @@ function GoogleLogo({ className = "h-4 w-4" }: { className?: string }) {
 
 function EngineIcon({ id, className }: { id: Engine; className?: string }) {
   if (id === "google") return <GoogleLogo className={className} />;
+  if (id === "custom") return <KeyRound className={cn("text-gold-500", className)} />;
   if (id === "mymemory")
     return (
       <span
@@ -111,6 +125,8 @@ export default function Translator({ notify }: { notify: Notify }) {
     return validEngine(v) ? v : "google";
   });
   const [usedEngine, setUsedEngine] = useState<EngineUsed | null>(null);
+  const [api, setApi] = useState<ApiSettings>(loadApiSettings);
+  const [showApi, setShowApi] = useState(false);
   const [auto, setAuto] = useState(() => store.get("salam-tr-auto", "1") === "1");
   const [email, setEmail] = useState(() => store.get("salam-tr-email", ""));
   const [emailDraft, setEmailDraft] = useState(() => store.get("salam-tr-email", ""));
@@ -130,6 +146,11 @@ export default function Translator({ notify }: { notify: Notify }) {
   useEffect(() => store.set("salam-tr-tgt", tgt), [tgt]);
   useEffect(() => store.set("salam-tr-auto", auto ? "1" : "0"), [auto]);
   useEffect(() => store.set("salam-tr-engine", engine), [engine]);
+  useEffect(() => saveApiSettings(api), [api]);
+  // با انتخاب «کلید اختصاصی» بدون کلید ذخیره‌شده، پنل خودکار باز شود
+  useEffect(() => {
+    if (engine === "custom" && !hasActiveKey(api)) setShowApi(true);
+  }, [engine, api]);
   useEffect(
     () => () => {
       abortRef.current?.abort();
@@ -175,16 +196,29 @@ export default function Translator({ notify }: { notify: Notify }) {
         notify(t("n_target_changed", { lang: ln(target) }), "info");
       }
 
+      const providerName = providerById(api.provider).name;
+      if (engine === "custom" && !hasActiveKey(api)) {
+        notify(t("api_need_key"), "error");
+        setShowApi(true);
+        return;
+      }
+
       setLoading(true);
       setProgress({ done: 0, total: 1 });
       try {
         const res = await translateText(value, source, target, {
           engine,
           email: email || undefined,
+          api,
           signal: ctrl.signal,
           onProgress: (done, total) => setProgress({ done, total }),
           onFallback: (failed) =>
-            notify(t("n_fallback", { engine: engineName(failed, lang) }), "info"),
+            notify(
+              failed === "custom"
+                ? t("n_fallback_custom", { provider: providerName })
+                : t("n_fallback", { engine: engineName(failed, lang) }),
+              "info"
+            ),
         });
         setOutput(res.text);
         setAlternatives(res.alternatives);
@@ -219,7 +253,10 @@ export default function Translator({ notify }: { notify: Notify }) {
         });
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
-        if (e instanceof TranslateError && e.kind === "quota") {
+        if (e instanceof ProviderError) {
+          notify(providerErrorMessage(e, t, providerName), "error");
+          if (e.kind === "unauthorized") setShowApi(true);
+        } else if (e instanceof TranslateError && e.kind === "quota") {
           notify(t("n_quota"), "error");
           setShowEmail(true);
         } else if (e instanceof TranslateError && e.kind === "blocked") {
@@ -233,7 +270,7 @@ export default function Translator({ notify }: { notify: Notify }) {
         if (abortRef.current === ctrl) setLoading(false);
       }
     },
-    [input, src, tgt, engine, email, notify, t, ln, lang]
+    [input, src, tgt, engine, email, api, notify, t, ln, lang]
   );
 
   // auto translate (debounced)
@@ -374,6 +411,8 @@ export default function Translator({ notify }: { notify: Notify }) {
         src: src === "auto" ? detected || detectLang(input) : src,
         tgt,
         engine: usedEngine ?? "google",
+        providerName: providerById(api.provider).name,
+        modelName: shortModel(activeModel(api)),
         i18n,
       });
       notify(t("n_pdf_done"), "success");
@@ -482,46 +521,86 @@ export default function Translator({ notify }: { notify: Notify }) {
             <Cpu className="h-4 w-4 text-emerald-500" />
             {t("engine_title")}
           </div>
-          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {ENGINES.map((e) => {
               const active = engine === e.id;
+              const isCustom = e.id === "custom";
+              const keyReady = hasActiveKey(api);
+              const desc =
+                isCustom && keyReady
+                  ? t("api_desc_on", {
+                      provider: providerById(api.provider).name,
+                      model: shortModel(activeModel(api)),
+                    })
+                  : e.desc[lang];
               return (
-                <button
+                <div
                   key={e.id}
-                  type="button"
-                  onClick={() => setEngine(e.id)}
-                  title={e.desc[lang]}
-                  aria-pressed={active}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-start transition active:scale-[0.98]",
+                    "relative flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 transition",
                     active
                       ? "bg-emerald-500/10 ring-2 ring-emerald-500 dark:bg-emerald-400/10"
                       : "bg-cream ring-1 ring-pine-900/8 hover:bg-sand dark:bg-white/6 dark:ring-white/10 dark:hover:bg-white/10"
                   )}
                 >
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white shadow-sm ring-1 ring-pine-900/8 dark:bg-white/10 dark:ring-white/10">
-                    <EngineIcon id={e.id} className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0">
-                    <span
+                  <button
+                    type="button"
+                    onClick={() => setEngine(e.id)}
+                    title={desc}
+                    aria-pressed={active}
+                    className="flex min-w-0 flex-1 items-center gap-2.5 text-start active:scale-[0.98]"
+                  >
+                    <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white shadow-sm ring-1 ring-pine-900/8 dark:bg-white/10 dark:ring-white/10">
+                      <EngineIcon id={e.id} className="h-4 w-4" />
+                      {isCustom && keyReady && (
+                        <span className="absolute -end-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-pine-950" />
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span
+                        className={cn(
+                          "block truncate text-[14px] font-black",
+                          active ? "text-pine-950 dark:text-white" : "text-ink/75 dark:text-white/75"
+                        )}
+                      >
+                        {e.label[lang]}
+                      </span>
+                      <span
+                        className="hidden truncate text-[11px] font-medium text-ink/45 sm:block dark:text-white/45"
+                        dir={isCustom && keyReady ? "ltr" : undefined}
+                      >
+                        {desc}
+                      </span>
+                    </span>
+                  </button>
+                  {isCustom ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowApi((v) => !v)}
+                      title={t("api_panel_title")}
+                      aria-label={t("api_panel_title")}
+                      aria-expanded={showApi}
                       className={cn(
-                        "block truncate text-[14px] font-black",
-                        active ? "text-pine-950 dark:text-white" : "text-ink/75 dark:text-white/75"
+                        "grid h-8 w-8 shrink-0 place-items-center rounded-lg transition active:scale-95",
+                        showApi
+                          ? "bg-pine-950 text-white dark:bg-gold-400 dark:text-pine-950"
+                          : "text-ink/50 hover:bg-pine-950/8 hover:text-pine-950 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
                       )}
                     >
-                      {e.label[lang]}
-                    </span>
-                    <span className="hidden truncate text-[11px] font-medium text-ink/45 sm:block dark:text-white/45">
-                      {e.desc[lang]}
-                    </span>
-                  </span>
-                  {active && (
-                    <Check className="ms-auto h-4 w-4 shrink-0 text-emerald-500" strokeWidth={3} />
+                      <Settings2 className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    active && <Check className="h-4 w-4 shrink-0 text-emerald-500" strokeWidth={3} />
                   )}
-                </button>
+                </div>
               );
             })}
           </div>
+
+          {/* پنل کلید اختصاصی */}
+          <AnimatePresence initial={false}>
+            {showApi && <ApiKeyPanel settings={api} onChange={setApi} notify={notify} />}
+          </AnimatePresence>
         </div>
 
         {/* panes */}
@@ -638,7 +717,9 @@ export default function Translator({ notify }: { notify: Notify }) {
                 {usedEngine && output && !loading && (
                   <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-black text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
                     <EngineIcon id={usedEngine} className="h-3 w-3" />
-                    {t("via_engine", { engine: engineName(usedEngine, lang) })}
+                    {t("via_engine", {
+                      engine: engineName(usedEngine, lang, providerById(api.provider).name),
+                    })}
                   </span>
                 )}
               </span>
