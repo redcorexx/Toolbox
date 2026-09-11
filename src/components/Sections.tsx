@@ -10,9 +10,13 @@ import {
   ShieldCheck,
   Zap,
 } from "lucide-react";
-import { GithubIcon } from "./icons";
+import { GithubIcon, TelegramIcon } from "./icons";
 import { useI18n } from "../lib/i18n";
 import type { Notify } from "../lib/translator";
+
+/* لینک‌های شبکه‌های اجتماعی پایین صفحه */
+export const GITHUB_URL = "https://github.com/codewave4/Translator";
+export const TELEGRAM_URL = "https://t.me/DeepRed_Code";
 
 function CodeBlock({ code, notify }: { code: string; notify: Notify }) {
   const { t } = useI18n();
@@ -184,10 +188,35 @@ export function Footer() {
         <p className="text-[13px] font-medium leading-7 text-ink/50 dark:text-white/50">
           {t("footer_powered")}
         </p>
-        <p className="flex items-center gap-1.5 text-[13px] font-bold text-ink/60 dark:text-white/60">
-          <span dir="ltr">{year}</span> • {t("footer_made")}
-          <Heart className="h-4 w-4 fill-clay-500 text-clay-500" />
-        </p>
+        <div className="flex flex-col items-center gap-3 sm:items-end">
+          <p className="flex items-center gap-1.5 text-[13px] font-bold text-ink/60 dark:text-white/60">
+            <span dir="ltr">{year}</span> • {t("footer_made")}
+            <Heart className="h-4 w-4 fill-clay-500 text-clay-500" />
+          </p>
+          {/* لوگوهای گیت‌هاب و تلگرام */}
+          <div className="flex items-center gap-2">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="GitHub — codewave4/Translator"
+              aria-label="GitHub"
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-pine-950 text-white shadow-md ring-1 ring-white/10 transition hover:-translate-y-1 hover:bg-black hover:shadow-lg dark:bg-white/10 dark:hover:bg-white dark:hover:text-pine-950"
+            >
+              <GithubIcon className="h-5 w-5" />
+            </a>
+            <a
+              href={TELEGRAM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Telegram — @DeepRed_Code"
+              aria-label="Telegram"
+              className="grid h-11 w-11 place-items-center rounded-2xl bg-[#229ED9] text-white shadow-md shadow-[#229ED9]/30 transition hover:-translate-y-1 hover:bg-[#1b8cc2] hover:shadow-lg"
+            >
+              <TelegramIcon className="h-5 w-5" />
+            </a>
+          </div>
+        </div>
       </div>
     </footer>
   );
