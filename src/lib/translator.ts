@@ -1,7 +1,8 @@
 /* ============================================================
    Salam Translator — core library
-   Translation via the free MyMemory API (no key required).
-   https://mymemory.translated.net/doc/spec.php
+   موتورهای ترجمه:
+     • گوگل     — endpoint آزاد translate.googleapis.com (client=gtx) بدون کلید
+     • MyMemory  — API رایگان https://mymemory.translated.net/doc/spec.php
    ============================================================ */
 
 export interface Lang {
@@ -36,15 +37,37 @@ export const LANGUAGES: Lang[] = [
   { code: "vi", fa: "ویتنامی", native: "Tiếng Việt", speech: "vi-VN" },
 ];
 
+export const isKnownLang = (code: string): boolean =>
+  LANGUAGES.some((l) => l.code === code);
+
 export const langByCode = (code: string): Lang =>
-  LANGUAGES.find((l) => l.code === code) ?? LANGUAGES[1];
+  LANGUAGES.find((l) => l.code === code) ?? {
+    code,
+    fa: code.toUpperCase(),
+    native: code,
+    speech: code,
+  };
 
 const FA_DIGITS = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"];
 
 export const toFa = (value: string | number): string =>
   String(value).replace(/[0-9]/g, (d) => FA_DIGITS[+d]);
 
-/* ---------------- language detection (script based) ---------------- */
+/* ---------------- موتورهای ترجمه ---------------- */
+
+export type Engine = "google" | "mymemory" | "auto";
+export type EngineUsed = "google" | "mymemory";
+
+export const ENGINES: { id: Engine; label: string; desc: string }[] = [
+  { id: "google", label: "گوگل", desc: "کیفیت بالا و تشخیص دقیق زبان" },
+  { id: "mymemory", label: "MyMemory", desc: "حافظه ترجمه با سهمیه روزانه" },
+  { id: "auto", label: "خودکار", desc: "اول گوگل؛ اگر نشد، MyMemory" },
+];
+
+export const engineName = (e: EngineUsed): string =>
+  e === "google" ? "گوگل" : "MyMemory";
+
+/* ---------------- تشخیص زبان (بر اساس خط نوشتاری) ---------------- */
 
 export function detectLang(text: string): string {
   const t = text.trim();
@@ -56,17 +79,15 @@ export function detectLang(text: string): string {
   if (/[\u0900-\u097F]/.test(t)) return "hi"; // devanagari
   if (/[\u0E00-\u0E7F]/.test(t)) return "th"; // thai
   if (/[\u0600-\u06FF]/.test(t)) {
-    // Persian-specific chars (گ چ پ ژ) + Persian yeh/kaf + ZWNJ
+    // حروف مخصوص فارسی (گ چ پ ژ) + ی و ک فارسی + نیم‌فاصله
     return /[گچپژ\u06CC\u06A9\u200C]/.test(t) ? "fa" : "ar";
   }
   return "en";
 }
 
-/* ---------------- chunking (API limit ≈ 500 chars/query) ---------------- */
+/* ---------------- تکه‌تکه کردن متن‌های طولانی ---------------- */
 
-const MAX_CHUNK = 450;
-
-export function chunkText(text: string): string[] {
+export function chunkText(text: string, maxChunk = 450): string[] {
   const tokens = text.split(/(\n+)/);
   const out: string[] = [];
   for (const tok of tokens) {
@@ -82,11 +103,11 @@ export function chunkText(text: string): string[] {
       cur = "";
     };
     for (let s of sentences) {
-      if ((cur + s).length > MAX_CHUNK) {
+      if ((cur + s).length > maxChunk) {
         flush();
-        while (s.length > MAX_CHUNK) {
-          let cut = s.lastIndexOf(" ", MAX_CHUNK);
-          if (cut < 60) cut = MAX_CHUNK;
+        while (s.length > maxChunk) {
+          let cut = s.lastIndexOf(" ", maxChunk);
+          if (cut < 60) cut = maxChunk;
           out.push(s.slice(0, cut));
           s = s.slice(cut);
         }
@@ -100,7 +121,19 @@ export function chunkText(text: string): string[] {
   return out.filter((p) => p.length > 0);
 }
 
-/* ---------------- API ---------------- */
+/* ---------------- خطاها ---------------- */
+
+export type ErrorKind = "quota" | "network" | "generic" | "blocked";
+
+export class TranslateError extends Error {
+  kind: ErrorKind;
+  constructor(kind: ErrorKind) {
+    super(kind);
+    this.kind = kind;
+  }
+}
+
+const isAbort = (e: unknown) => (e as Error)?.name === "AbortError";
 
 function decodeHtml(s: string): string {
   const el = document.createElement("textarea");
@@ -108,20 +141,133 @@ function decodeHtml(s: string): string {
   return el.value;
 }
 
-export class TranslateError extends Error {
-  kind: "quota" | "network" | "generic";
-  constructor(kind: "quota" | "network" | "generic") {
-    super(kind);
-    this.kind = kind;
+interface ChunkOut {
+  text: string;
+  detected: string;
+  alternatives: string[];
+}
+
+/* ---------------- موتور گوگل ---------------- */
+
+const GOOGLE_CHUNK = 800;
+
+function normalizeGoogleCode(code: string): string {
+  const c = code.toLowerCase();
+  if (c === "iw") return "he";
+  if (c === "jw") return "jv";
+  if (c.startsWith("zh")) return "zh";
+  return c.split("-")[0];
+}
+
+async function googleFetch(url: string, signal?: AbortSignal): Promise<unknown> {
+  let res: Response;
+  try {
+    res = await fetch(url, { signal });
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    throw new TranslateError("network");
+  }
+  if (res.status === 429 || res.status === 403) throw new TranslateError("blocked");
+  if (!res.ok) throw new TranslateError("generic");
+  const data = await res.json().catch(() => null);
+  if (data == null) throw new TranslateError("generic");
+  return data;
+}
+
+/** endpoint اصلی: translate.googleapis.com (همان API افزونه‌های مرورگر) */
+async function googlePrimary(
+  q: string,
+  sl: string,
+  tl: string,
+  signal?: AbortSignal
+): Promise<ChunkOut> {
+  const params = new URLSearchParams({ client: "gtx", sl, tl, dt: "t", q });
+  params.append("dt", "at"); // ترجمه‌های جایگزین
+  const data = (await googleFetch(
+    `https://translate.googleapis.com/translate_a/single?${params.toString()}`,
+    signal
+  )) as unknown[];
+
+  if (!Array.isArray(data) || !Array.isArray(data[0])) {
+    throw new TranslateError("generic");
+  }
+  const text = (data[0] as unknown[])
+    .map((seg) => (Array.isArray(seg) && typeof seg[0] === "string" ? seg[0] : ""))
+    .join("");
+  if (!text.trim()) throw new TranslateError("generic");
+
+  const detected =
+    typeof data[2] === "string" ? normalizeGoogleCode(data[2]) : sl;
+
+  const alternatives: string[] = [];
+  try {
+    const alts = data[5];
+    if (Array.isArray(alts) && alts.length === 1) {
+      const list = (alts[0] as unknown[])?.[2];
+      if (Array.isArray(list)) {
+        for (const a of list) {
+          if (Array.isArray(a) && typeof a[0] === "string") alternatives.push(a[0]);
+        }
+      }
+    }
+  } catch {
+    /* ساختار جایگزین‌ها مهم نیست */
+  }
+  return { text, detected, alternatives };
+}
+
+/** endpoint پشتیبان: clients5.google.com (API دیکشنری کروم) */
+async function googleSecondary(
+  q: string,
+  sl: string,
+  tl: string,
+  signal?: AbortSignal
+): Promise<ChunkOut> {
+  const params = new URLSearchParams({ client: "dict-chrome-ex", sl, tl, q });
+  const data = await googleFetch(
+    `https://clients5.google.com/translate_a/t?${params.toString()}`,
+    signal
+  );
+
+  let text = "";
+  let detected = sl;
+  if (Array.isArray(data)) {
+    const first = data[0];
+    if (typeof first === "string") text = first;
+    else if (Array.isArray(first)) {
+      if (typeof first[0] === "string") text = first[0];
+      if (typeof first[1] === "string") detected = normalizeGoogleCode(first[1]);
+    }
+  } else if (data && typeof data === "object") {
+    const obj = data as { sentences?: { trans?: string }[]; src?: string };
+    if (Array.isArray(obj.sentences)) {
+      text = obj.sentences.map((s) => s.trans ?? "").join("");
+    }
+    if (typeof obj.src === "string") detected = normalizeGoogleCode(obj.src);
+  }
+  if (!text.trim()) throw new TranslateError("generic");
+  return { text, detected, alternatives: [] };
+}
+
+async function googleChunk(
+  q: string,
+  sl: string,
+  tl: string,
+  signal?: AbortSignal
+): Promise<ChunkOut> {
+  try {
+    return await googlePrimary(q, sl, tl, signal);
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    return googleSecondary(q, sl, tl, signal);
   }
 }
 
-interface ChunkOut {
-  text: string;
-  matches: { translation?: string; quality?: string | number }[];
-}
+/* ---------------- موتور MyMemory ---------------- */
 
-async function translateChunk(
+const MYMEMORY_CHUNK = 450;
+
+async function myMemoryChunk(
   q: string,
   src: string,
   tgt: string,
@@ -137,7 +283,7 @@ async function translateChunk(
   try {
     res = await fetch(url, { signal });
   } catch (e) {
-    if ((e as Error).name === "AbortError") throw e;
+    if (isAbort(e)) throw e;
     throw new TranslateError("network");
   }
   if (res.status === 429) throw new TranslateError("quota");
@@ -160,35 +306,51 @@ async function translateChunk(
   if (!status.startsWith("2") || !translated) {
     throw new TranslateError("generic");
   }
-  return {
-    text: decodeHtml(translated),
-    matches: Array.isArray(data.matches) ? data.matches : [],
-  };
+
+  const alternatives: string[] = [];
+  const matches: { translation?: string; quality?: string | number }[] =
+    Array.isArray(data.matches) ? data.matches : [];
+  for (const m of matches) {
+    const t = decodeHtml(String(m.translation ?? "")).trim();
+    if (t && Number(m.quality ?? 0) > 0) alternatives.push(t);
+  }
+
+  return { text: decodeHtml(translated), detected: src, alternatives };
 }
+
+/* ---------------- هماهنگ‌کننده ---------------- */
 
 export interface TranslateResult {
   text: string;
   alternatives: string[];
   chunks: number;
+  detected: string;
+  engine: EngineUsed;
 }
 
-export async function translateText(
+export interface TranslateOptions {
+  engine?: Engine;
+  email?: string;
+  signal?: AbortSignal;
+  onProgress?: (done: number, total: number) => void;
+  onFallback?: (failed: EngineUsed) => void;
+}
+
+async function runEngine(
+  engine: EngineUsed,
   text: string,
   src: string,
   tgt: string,
-  opts: {
-    email?: string;
-    signal?: AbortSignal;
-    onProgress?: (done: number, total: number) => void;
-  } = {}
+  opts: TranslateOptions
 ): Promise<TranslateResult> {
-  const parts = chunkText(text);
-  const jobs = parts.filter((p) => !/^\n+$/.test(p));
-  const total = jobs.length || 1;
+  const parts = chunkText(text, engine === "google" ? GOOGLE_CHUNK : MYMEMORY_CHUNK);
+  const total = parts.filter((p) => !/^\n+$/.test(p)).length || 1;
   opts.onProgress?.(0, total);
 
+  const guessed = src === "auto" ? detectLang(text) : src;
+  let detected = "";
   let done = 0;
-  let firstMatches: ChunkOut["matches"] = [];
+  let firstAlternatives: string[] = [];
   const outParts: string[] = [];
 
   for (const p of parts) {
@@ -196,8 +358,13 @@ export async function translateText(
       outParts.push(p);
       continue;
     }
-    const r = await translateChunk(p, src, tgt, opts.email || undefined, opts.signal);
-    if (firstMatches.length === 0) firstMatches = r.matches;
+    const r =
+      engine === "google"
+        ? await googleChunk(p, src === "auto" ? "auto" : src, tgt, opts.signal)
+        : await myMemoryChunk(p, guessed, tgt, opts.email || undefined, opts.signal);
+
+    if (!detected && r.detected && r.detected !== "auto") detected = r.detected;
+    if (done === 0) firstAlternatives = r.alternatives;
     outParts.push(r.text);
     done += 1;
     opts.onProgress?.(done, total);
@@ -209,23 +376,47 @@ export async function translateText(
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  const mainFirst =
-    outParts.find((p) => !/^\n+$/.test(p))?.trim().toLowerCase() ?? "";
-  const seen = new Set([mainFirst]);
+  // جایگزین‌ها فقط وقتی معنی دارند که متن یک تکه باشد
   const alternatives: string[] = [];
-  for (const m of firstMatches) {
-    const t = decodeHtml(String(m.translation ?? "")).trim();
-    const q = Number(m.quality ?? 0);
-    if (!t || q <= 0 || seen.has(t.toLowerCase())) continue;
-    seen.add(t.toLowerCase());
-    alternatives.push(t);
-    if (alternatives.length >= 3) break;
+  if (total === 1) {
+    const seen = new Set([full.toLowerCase()]);
+    for (const a of firstAlternatives) {
+      const k = a.trim().toLowerCase();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      alternatives.push(a.trim());
+      if (alternatives.length >= 3) break;
+    }
   }
 
-  return { text: full, alternatives, chunks: total };
+  return {
+    text: full,
+    alternatives,
+    chunks: total,
+    detected: detected || guessed,
+    engine,
+  };
 }
 
-/* ---------------- speech (TTS / STT) ---------------- */
+export async function translateText(
+  text: string,
+  src: string,
+  tgt: string,
+  opts: TranslateOptions = {}
+): Promise<TranslateResult> {
+  const engine = opts.engine ?? "google";
+  if (engine !== "auto") return runEngine(engine, text, src, tgt, opts);
+
+  try {
+    return await runEngine("google", text, src, tgt, opts);
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    opts.onFallback?.("google");
+    return runEngine("mymemory", text, src, tgt, opts);
+  }
+}
+
+/* ---------------- گفتار (TTS / STT) ---------------- */
 
 declare global {
   interface Window {
@@ -267,7 +458,7 @@ export function canListen(): boolean {
   );
 }
 
-/* ---------------- storage ---------------- */
+/* ---------------- ذخیره‌سازی ---------------- */
 
 export interface HistoryItem {
   id: string;
@@ -277,6 +468,7 @@ export interface HistoryItem {
   translatedText: string;
   time: number;
   fav: boolean;
+  engine?: EngineUsed;
 }
 
 const HKEY = "salam-tr-history-v1";
