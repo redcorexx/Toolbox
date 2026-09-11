@@ -1,7 +1,6 @@
 import { Globe, Languages, Moon, Sun } from "lucide-react";
 import { GithubIcon } from "./icons";
 import { useI18n } from "../lib/i18n";
-import { cn } from "../utils/cn";
 
 interface Props {
   theme: "dark" | "light";
@@ -15,7 +14,7 @@ export default function Header({ theme, onToggleTheme }: Props) {
     { href: "#translator", label: t("nav_translator") },
     { href: "#history", label: t("nav_history") },
     { href: "#deploy", label: t("nav_deploy") },
-    { href: "#source", label: t("nav_source"), accent: true },
+    { href: "#source", label: t("nav_source") },
   ];
 
   return (
@@ -77,24 +76,6 @@ export default function Header({ theme, onToggleTheme }: Props) {
           </button>
         </div>
       </div>
-
-      {/* منوی موبایل */}
-      <nav className="flex items-center gap-1 overflow-x-auto px-4 pb-3 text-[13px] font-black text-ink/60 md:hidden dark:text-white/60">
-        {links.map((l) => (
-          <a
-            key={l.href}
-            href={l.href}
-            className={cn(
-              "whitespace-nowrap rounded-lg px-3.5 py-2",
-              l.accent
-                ? "bg-clay-500/12 text-clay-600 dark:text-gold-400"
-                : "bg-pine-950/5 dark:bg-white/8"
-            )}
-          >
-            {l.label}
-          </a>
-        ))}
-      </nav>
     </header>
   );
 }
