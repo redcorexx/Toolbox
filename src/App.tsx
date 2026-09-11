@@ -3,8 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, BadgeCheck, CheckCircle2, Info } from "lucide-react";
 import Header from "./components/Header";
 import Translator from "./components/Translator";
-import { Deploy, Features, Footer } from "./components/Sections";
-import SourceExport from "./components/SourceExport";
+import { Features, Footer } from "./components/Sections";
 import { LANGUAGES, type ToastType } from "./lib/translator";
 import {
   I18nContext,
@@ -134,10 +133,10 @@ export default function App() {
                 {t("hero_cta_start")}
               </a>
               <a
-                href="#source"
+                href="#history"
                 className="rounded-2xl bg-white px-6 py-3 text-sm font-black text-pine-950 shadow-md ring-1 ring-pine-900/10 transition hover:-translate-y-0.5 hover:ring-clay-500/40 dark:bg-white/8 dark:text-white dark:ring-white/15 dark:hover:bg-white/12"
               >
-                {t("hero_cta_files")}
+                {t("nav_history")}
               </a>
             </motion.div>
           </div>
@@ -146,8 +145,6 @@ export default function App() {
         <main className="pb-4">
           <Translator notify={notify} />
           <Features />
-          <Deploy notify={notify} />
-          <SourceExport notify={notify} />
         </main>
         <Footer />
 
