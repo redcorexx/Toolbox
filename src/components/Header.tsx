@@ -14,8 +14,6 @@ export default function Header({ theme, onToggleTheme }: Props) {
   const links = [
     { href: "#translator", label: t("nav_translator") },
     { href: "#history", label: t("nav_history") },
-    { href: "#deploy", label: t("nav_deploy") },
-    { href: "#source", label: t("nav_source") },
   ];
 
   return (
@@ -58,7 +56,6 @@ export default function Header({ theme, onToggleTheme }: Props) {
             {t("github_btn")}
           </a>
 
-          {/* دکمه تغییر زبان رابط کاربری (فارسی / English) */}
           <button
             onClick={toggle}
             title={t("lang_switch")}
