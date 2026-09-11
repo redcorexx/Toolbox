@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Search, Wand2 } from "lucide-react";
 import { LANGUAGES } from "../lib/translator";
+import { useI18n } from "../lib/i18n";
 import { cn } from "../utils/cn";
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function LanguageSelect({ value, onChange, allowAuto }: Props) {
+  const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -31,6 +33,7 @@ export default function LanguageSelect({ value, onChange, allowAuto }: Props) {
     (l) =>
       !query ||
       l.fa.includes(q.trim()) ||
+      l.en.toLowerCase().includes(query) ||
       l.native.toLowerCase().includes(query) ||
       l.code.includes(query)
   );
@@ -59,7 +62,7 @@ export default function LanguageSelect({ value, onChange, allowAuto }: Props) {
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-pine-950/8 text-[13px] font-black text-pine-800 dark:bg-white/12 dark:text-gold-400">
                 {current.code.toUpperCase()}
               </span>
-              <span className="truncate">{current.fa}</span>
+              <span className="truncate">{current[lang]}</span>
               <span className="hidden truncate text-xs font-medium opacity-50 lg:inline">
                 {current.native}
               </span>
@@ -69,7 +72,7 @@ export default function LanguageSelect({ value, onChange, allowAuto }: Props) {
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-clay-500/12 text-clay-600 dark:bg-clay-500/25 dark:text-clay-400">
                 <Wand2 className="h-4 w-4" />
               </span>
-              <span className="truncate">تشخیص خودکار</span>
+              <span className="truncate">{t("auto_detect")}</span>
             </>
           )}
         </span>
@@ -85,7 +88,7 @@ export default function LanguageSelect({ value, onChange, allowAuto }: Props) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.18 }}
-            className="absolute right-0 top-full z-30 mt-2 w-64 max-w-[80vw] overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-pine-900/10 dark:bg-pine-900 dark:ring-white/15"
+            className="absolute start-0 top-full z-30 mt-2 w-64 max-w-[80vw] overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-pine-900/10 dark:bg-pine-900 dark:ring-white/15"
           >
             <div className="border-b border-pine-900/8 p-2 dark:border-white/10">
               <div className="flex items-center gap-2 rounded-xl bg-cream px-3 py-2 dark:bg-white/8">
@@ -94,7 +97,7 @@ export default function LanguageSelect({ value, onChange, allowAuto }: Props) {
                   autoFocus
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="جست‌وجوی زبان..."
+                  placeholder={t("search_lang")}
                   className="w-full bg-transparent text-sm font-medium text-ink outline-none placeholder:text-ink/35 dark:text-white dark:placeholder:text-white/35"
                 />
               </div>
@@ -113,7 +116,7 @@ export default function LanguageSelect({ value, onChange, allowAuto }: Props) {
                 >
                   <span className="flex items-center gap-2">
                     <Wand2 className="h-4 w-4" />
-                    تشخیص خودکار
+                    {t("auto_detect")}
                   </span>
                   {value === "auto" && <Check className="h-4 w-4" />}
                 </button>
@@ -141,8 +144,8 @@ export default function LanguageSelect({ value, onChange, allowAuto }: Props) {
                     >
                       {l.code.toUpperCase()}
                     </span>
-                    <span>{l.fa}</span>
-                    <span className="text-xs opacity-50" dir="ltr">
+                    <span>{l[lang]}</span>
+                    <span className="text-xs opacity-50" dir="auto">
                       {l.native}
                     </span>
                   </span>
@@ -151,7 +154,7 @@ export default function LanguageSelect({ value, onChange, allowAuto }: Props) {
               ))}
               {list.length === 0 && (
                 <p className="px-3 py-6 text-center text-sm font-medium text-ink/45 dark:text-white/45">
-                  زبانی پیدا نشد
+                  {t("no_lang")}
                 </p>
               )}
             </div>
