@@ -24,6 +24,12 @@
         if ((localStorage.getItem("salam-tr-theme") || "dark") === "dark") {
           document.documentElement.classList.add("dark");
         }
+        // زبان رابط کاربری: فارسی (پیش‌فرض) یا انگلیسی
+        if (localStorage.getItem("salam-tr-lang") === "en") {
+          document.documentElement.lang = "en";
+          document.documentElement.dir = "ltr";
+          document.title = "Text Translator | Persian ↔ English & 20+ languages";
+        }
       } catch (e) {}
     </script>
   </head>
