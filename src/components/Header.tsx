@@ -16,7 +16,7 @@ export default function Header({ theme, onToggleTheme }: Props) {
           </span>
           <span className="leading-tight">
             <span className="block text-lg font-black text-pine-950 dark:text-white">
-              مترجم سلام
+              مترجم متن
             </span>
             <span className="block text-[11px] font-medium text-ink/50 dark:text-white/50">
               رایگان • بدون ثبت‌نام • متن‌باز
