@@ -5,36 +5,39 @@
      • MyMemory  — API رایگان https://mymemory.translated.net/doc/spec.php
    ============================================================ */
 
+export type UiLangCode = "fa" | "en";
+
 export interface Lang {
   code: string;
   fa: string;
+  en: string;
   native: string;
   speech: string;
 }
 
 export const LANGUAGES: Lang[] = [
-  { code: "fa", fa: "فارسی", native: "فارسی", speech: "fa-IR" },
-  { code: "en", fa: "انگلیسی", native: "English", speech: "en-US" },
-  { code: "ar", fa: "عربی", native: "العربية", speech: "ar-SA" },
-  { code: "tr", fa: "ترکی", native: "Türkçe", speech: "tr-TR" },
-  { code: "fr", fa: "فرانسوی", native: "Français", speech: "fr-FR" },
-  { code: "de", fa: "آلمانی", native: "Deutsch", speech: "de-DE" },
-  { code: "es", fa: "اسپانیایی", native: "Español", speech: "es-ES" },
-  { code: "it", fa: "ایتالیایی", native: "Italiano", speech: "it-IT" },
-  { code: "ru", fa: "روسی", native: "Русский", speech: "ru-RU" },
-  { code: "zh", fa: "چینی", native: "中文", speech: "zh-CN" },
-  { code: "ja", fa: "ژاپنی", native: "日本語", speech: "ja-JP" },
-  { code: "ko", fa: "کره‌ای", native: "한국어", speech: "ko-KR" },
-  { code: "hi", fa: "هندی", native: "हिन्दी", speech: "hi-IN" },
-  { code: "pt", fa: "پرتغالی", native: "Português", speech: "pt-PT" },
-  { code: "nl", fa: "هلندی", native: "Nederlands", speech: "nl-NL" },
-  { code: "sv", fa: "سوئدی", native: "Svenska", speech: "sv-SE" },
-  { code: "pl", fa: "لهستانی", native: "Polski", speech: "pl-PL" },
-  { code: "uk", fa: "اوکراینی", native: "Українська", speech: "uk-UA" },
-  { code: "id", fa: "اندونزیایی", native: "Indonesia", speech: "id-ID" },
-  { code: "ms", fa: "مالایی", native: "Melayu", speech: "ms-MY" },
-  { code: "th", fa: "تایلندی", native: "ไทย", speech: "th-TH" },
-  { code: "vi", fa: "ویتنامی", native: "Tiếng Việt", speech: "vi-VN" },
+  { code: "fa", fa: "فارسی", en: "Persian", native: "فارسی", speech: "fa-IR" },
+  { code: "en", fa: "انگلیسی", en: "English", native: "English", speech: "en-US" },
+  { code: "ar", fa: "عربی", en: "Arabic", native: "العربية", speech: "ar-SA" },
+  { code: "tr", fa: "ترکی", en: "Turkish", native: "Türkçe", speech: "tr-TR" },
+  { code: "fr", fa: "فرانسوی", en: "French", native: "Français", speech: "fr-FR" },
+  { code: "de", fa: "آلمانی", en: "German", native: "Deutsch", speech: "de-DE" },
+  { code: "es", fa: "اسپانیایی", en: "Spanish", native: "Español", speech: "es-ES" },
+  { code: "it", fa: "ایتالیایی", en: "Italian", native: "Italiano", speech: "it-IT" },
+  { code: "ru", fa: "روسی", en: "Russian", native: "Русский", speech: "ru-RU" },
+  { code: "zh", fa: "چینی", en: "Chinese", native: "中文", speech: "zh-CN" },
+  { code: "ja", fa: "ژاپنی", en: "Japanese", native: "日本語", speech: "ja-JP" },
+  { code: "ko", fa: "کره‌ای", en: "Korean", native: "한국어", speech: "ko-KR" },
+  { code: "hi", fa: "هندی", en: "Hindi", native: "हिन्दी", speech: "hi-IN" },
+  { code: "pt", fa: "پرتغالی", en: "Portuguese", native: "Português", speech: "pt-PT" },
+  { code: "nl", fa: "هلندی", en: "Dutch", native: "Nederlands", speech: "nl-NL" },
+  { code: "sv", fa: "سوئدی", en: "Swedish", native: "Svenska", speech: "sv-SE" },
+  { code: "pl", fa: "لهستانی", en: "Polish", native: "Polski", speech: "pl-PL" },
+  { code: "uk", fa: "اوکراینی", en: "Ukrainian", native: "Українська", speech: "uk-UA" },
+  { code: "id", fa: "اندونزیایی", en: "Indonesian", native: "Indonesia", speech: "id-ID" },
+  { code: "ms", fa: "مالایی", en: "Malay", native: "Melayu", speech: "ms-MY" },
+  { code: "th", fa: "تایلندی", en: "Thai", native: "ไทย", speech: "th-TH" },
+  { code: "vi", fa: "ویتنامی", en: "Vietnamese", native: "Tiếng Việt", speech: "vi-VN" },
 ];
 
 export const isKnownLang = (code: string): boolean =>
@@ -44,6 +47,7 @@ export const langByCode = (code: string): Lang =>
   LANGUAGES.find((l) => l.code === code) ?? {
     code,
     fa: code.toUpperCase(),
+    en: code.toUpperCase(),
     native: code,
     speech: code,
   };
@@ -58,14 +62,32 @@ export const toFa = (value: string | number): string =>
 export type Engine = "google" | "mymemory" | "auto";
 export type EngineUsed = "google" | "mymemory";
 
-export const ENGINES: { id: Engine; label: string; desc: string }[] = [
-  { id: "google", label: "گوگل", desc: "کیفیت بالا و تشخیص دقیق زبان" },
-  { id: "mymemory", label: "MyMemory", desc: "حافظه ترجمه با سهمیه روزانه" },
-  { id: "auto", label: "خودکار", desc: "اول گوگل؛ اگر نشد، MyMemory" },
+export interface EngineInfo {
+  id: Engine;
+  label: { fa: string; en: string };
+  desc: { fa: string; en: string };
+}
+
+export const ENGINES: EngineInfo[] = [
+  {
+    id: "google",
+    label: { fa: "گوگل", en: "Google" },
+    desc: { fa: "کیفیت بالا و تشخیص دقیق زبان", en: "High quality, accurate detection" },
+  },
+  {
+    id: "mymemory",
+    label: { fa: "MyMemory", en: "MyMemory" },
+    desc: { fa: "حافظه ترجمه با سهمیه روزانه", en: "Translation memory, daily quota" },
+  },
+  {
+    id: "auto",
+    label: { fa: "خودکار", en: "Auto" },
+    desc: { fa: "اول گوگل؛ اگر نشد، MyMemory", en: "Google first, MyMemory fallback" },
+  },
 ];
 
-export const engineName = (e: EngineUsed): string =>
-  e === "google" ? "گوگل" : "MyMemory";
+export const engineName = (e: EngineUsed, lang: UiLangCode = "fa"): string =>
+  e === "google" ? (lang === "fa" ? "گوگل" : "Google") : "MyMemory";
 
 /* ---------------- تشخیص زبان (بر اساس خط نوشتاری) ---------------- */
 
@@ -545,29 +567,50 @@ export const store = {
   },
 };
 
-export function timeAgo(ts: number): string {
+export function timeAgo(ts: number, lang: UiLangCode = "fa"): string {
   const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
-  if (s < 60) return "لحظاتی پیش";
   const m = Math.floor(s / 60);
-  if (m < 60) return `${toFa(m)} دقیقه پیش`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${toFa(h)} ساعت پیش`;
   const d = Math.floor(h / 24);
+
+  if (lang === "en") {
+    if (s < 60) return "just now";
+    if (m < 60) return `${m} min ago`;
+    if (h < 24) return `${h} h ago`;
+    if (d === 1) return "yesterday";
+    if (d < 30) return `${d} days ago`;
+    return new Date(ts).toLocaleDateString("en-US");
+  }
+  if (s < 60) return "لحظاتی پیش";
+  if (m < 60) return `${toFa(m)} دقیقه پیش`;
+  if (h < 24) return `${toFa(h)} ساعت پیش`;
   if (d === 1) return "دیروز";
   if (d < 30) return `${toFa(d)} روز پیش`;
   return new Date(ts).toLocaleDateString("fa-IR");
 }
 
-export const QUICK_PHRASES = [
-  "سلام! حالت چطوره؟",
-  "این قیمتش چنده؟",
-  "لطفاً آروم‌تر صحبت کن.",
-  "ببخشید، اینجا کجاست؟",
-  "من گم شدم، می‌تونی کمکم کنی؟",
-  "یک قهوه لطفاً.",
-  "فردا ساعت چند همو ببینیم؟",
-  "خیلی ممنون از کمکت!",
-];
+export const QUICK_PHRASES: Record<UiLangCode, string[]> = {
+  fa: [
+    "سلام! حالت چطوره؟",
+    "این قیمتش چنده؟",
+    "لطفاً آروم‌تر صحبت کن.",
+    "ببخشید، اینجا کجاست؟",
+    "من گم شدم، می‌تونی کمکم کنی؟",
+    "یک قهوه لطفاً.",
+    "فردا ساعت چند همو ببینیم؟",
+    "خیلی ممنون از کمکت!",
+  ],
+  en: [
+    "Hello! How are you?",
+    "How much does this cost?",
+    "Could you speak more slowly, please?",
+    "Excuse me, where am I?",
+    "I'm lost, can you help me?",
+    "One coffee, please.",
+    "What time shall we meet tomorrow?",
+    "Thank you so much for your help!",
+  ],
+};
 
 export type ToastType = "success" | "error" | "info";
 export type Notify = (msg: string, type?: ToastType) => void;
