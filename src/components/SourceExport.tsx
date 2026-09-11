@@ -28,8 +28,10 @@ import envRaw from "../vite-env.d.ts?raw";
 import libRaw from "../lib/translator.ts?raw";
 import i18nRaw from "../lib/i18n.ts?raw";
 import pdfRaw from "../lib/pdf.ts?raw";
+import providersRaw from "../lib/providers.ts?raw";
 import cnRaw from "../utils/cn.ts?raw";
 import headerRaw from "./Header.tsx?raw";
+import apiPanelRaw from "./ApiKeyPanel.tsx?raw";
 import langSelectRaw from "./LanguageSelect.tsx?raw";
 import historyRaw from "./HistoryPanel.tsx?raw";
 import translatorRaw from "./Translator.tsx?raw";
@@ -61,18 +63,20 @@ const FILES: FileEntry[] = [
   { path: "src/App.tsx", code: appRaw },
   { path: "src/index.css", code: cssRaw },
   { path: "src/vite-env.d.ts", code: envRaw },
-  { path: "src/lib/translator.ts", code: libRaw },
-  { path: "src/lib/i18n.ts", code: i18nRaw, changed: { fa: "متن‌های PDF", en: "PDF strings" } },
-  { path: "src/lib/pdf.ts", code: pdfRaw, isNew: true, changed: { fa: "موتور ساخت PDF", en: "PDF export engine" } },
+  { path: "src/lib/translator.ts", code: libRaw, changed: { fa: "موتور «کلید اختصاصی»", en: "custom-key engine" } },
+  { path: "src/lib/i18n.ts", code: i18nRaw, changed: { fa: "متن‌های پنل کلید API", en: "API-key panel strings" } },
+  { path: "src/lib/pdf.ts", code: pdfRaw, changed: { fa: "نمایش نام مدل در PDF", en: "model name in PDF" } },
+  { path: "src/lib/providers.ts", code: providersRaw, isNew: true, changed: { fa: "OpenAI، Gemini، Groq، OpenRouter، Mistral", en: "OpenAI, Gemini, Groq, OpenRouter, Mistral" } },
   { path: "src/utils/cn.ts", code: cnRaw },
-  { path: "src/components/Header.tsx", code: headerRaw, changed: { fa: "لینک گیت‌هاب واقعی", en: "real GitHub link" } },
+  { path: "src/components/Header.tsx", code: headerRaw },
   { path: "src/components/LanguageSelect.tsx", code: langSelectRaw },
   { path: "src/components/HistoryPanel.tsx", code: historyRaw },
-  { path: "src/components/Translator.tsx", code: translatorRaw, changed: { fa: "دکمه دانلود PDF", en: "PDF download button" } },
-  { path: "src/components/Sections.tsx", code: sectionsRaw, changed: { fa: "لوگوی گیت‌هاب و تلگرام در فوتر", en: "GitHub & Telegram logos in footer" } },
-  { path: "src/components/icons.tsx", code: iconsRaw, changed: { fa: "آیکون تلگرام", en: "Telegram icon" } },
-  { path: "src/components/SourceExport.tsx", code: sourceExportRaw, changed: { fa: "افزودن فایل pdf.ts به لیست", en: "pdf.ts added to the list" } },
-  { path: "README.md", code: readmeRaw, changed: { fa: "معرفی خروجی PDF", en: "PDF export mentioned" } },
+  { path: "src/components/ApiKeyPanel.tsx", code: apiPanelRaw, isNew: true, changed: { fa: "پنل ورود کلید API", en: "API-key settings panel" } },
+  { path: "src/components/Translator.tsx", code: translatorRaw, changed: { fa: "کارت «کلید اختصاصی»", en: "“Your API key” card" } },
+  { path: "src/components/Sections.tsx", code: sectionsRaw },
+  { path: "src/components/icons.tsx", code: iconsRaw },
+  { path: "src/components/SourceExport.tsx", code: sourceExportRaw, changed: { fa: "افزودن فایل‌های جدید به لیست", en: "new files added to the list" } },
+  { path: "README.md", code: readmeRaw, changed: { fa: "معرفی کلید اختصاصی", en: "API-key feature mentioned" } },
   { path: ".gitignore", code: gitignoreRaw },
   { path: ".github/workflows/deploy.yml", code: deployRaw },
 ];
