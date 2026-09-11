@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ClipboardPaste,
   Copy,
+  Cpu,
   Eraser,
   Globe,
   Languages,
@@ -17,15 +18,19 @@ import {
   Type,
   Volume2,
   VolumeX,
+  Wand2,
 } from "lucide-react";
 import LanguageSelect from "./LanguageSelect";
 import HistoryPanel from "./HistoryPanel";
 import {
+  ENGINES,
   LANGUAGES,
   QUICK_PHRASES,
   TranslateError,
   canListen,
   detectLang,
+  engineName,
+  isKnownLang,
   langByCode,
   loadHistory,
   loadStats,
@@ -36,6 +41,8 @@ import {
   store,
   toFa,
   translateText,
+  type Engine,
+  type EngineUsed,
   type HistoryItem,
   type Notify,
   type Stats,
@@ -46,6 +53,38 @@ const MAX_LEN = 5000;
 
 const validCode = (c: string, allowAuto: boolean) =>
   (allowAuto && c === "auto") || LANGUAGES.some((l) => l.code === c);
+
+const validEngine = (v: string): v is Engine =>
+  ENGINES.some((e) => e.id === v);
+
+/* لوگوی گوگل */
+function GoogleLogo({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path fill="#EA4335" d="M12 5.4c1.9 0 3.2.8 3.9 1.5l2.9-2.8C17 2.4 14.7 1.4 12 1.4 7.9 1.4 4.3 3.8 2.6 7.2l3.3 2.6c.8-2.5 3.2-4.4 6.1-4.4z" />
+      <path fill="#4285F4" d="M22.2 12.2c0-.9-.1-1.5-.2-2.2H12v4h5.8c-.1 1-.8 2.4-2.2 3.4l3.2 2.5c1.9-1.8 3.4-4.4 3.4-7.7z" />
+      <path fill="#FBBC05" d="M5.9 14.2c-.2-.7-.4-1.4-.4-2.2s.1-1.5.4-2.2L2.6 7.2C1.8 8.7 1.4 10.3 1.4 12s.4 3.3 1.2 4.8l3.3-2.6z" />
+      <path fill="#34A853" d="M12 22.6c2.9 0 5.3-.9 7-2.6l-3.2-2.5c-.9.6-2.1 1-3.8 1-2.9 0-5.3-1.9-6.1-4.4l-3.3 2.6c1.7 3.4 5.3 5.9 9.4 5.9z" />
+    </svg>
+  );
+}
+
+function EngineIcon({ id, className }: { id: Engine; className?: string }) {
+  if (id === "google") return <GoogleLogo className={className} />;
+  if (id === "mymemory")
+    return (
+      <span
+        className={cn(
+          "grid place-items-center rounded-md bg-gradient-to-br from-orange-400 to-rose-500 font-black text-white",
+          className
+        )}
+        style={{ fontSize: "0.65em" }}
+      >
+        M
+      </span>
+    );
+  return <Wand2 className={cn("text-violet-500", className)} />;
+}
 
 export default function Translator({ notify }: { notify: Notify }) {
   const [input, setInput] = useState("");
@@ -62,6 +101,11 @@ export default function Translator({ notify }: { notify: Notify }) {
   const [detected, setDetected] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 1 });
+  const [engine, setEngine] = useState<Engine>(() => {
+    const v = store.get("salam-tr-engine", "google");
+    return validEngine(v) ? v : "google";
+  });
+  const [usedEngine, setUsedEngine] = useState<EngineUsed | null>(null);
   const [auto, setAuto] = useState(() => store.get("salam-tr-auto", "1") === "1");
   const [email, setEmail] = useState(() => store.get("salam-tr-email", ""));
   const [emailDraft, setEmailDraft] = useState(() => store.get("salam-tr-email", ""));
@@ -79,6 +123,7 @@ export default function Translator({ notify }: { notify: Notify }) {
   useEffect(() => store.set("salam-tr-src", src), [src]);
   useEffect(() => store.set("salam-tr-tgt", tgt), [tgt]);
   useEffect(() => store.set("salam-tr-auto", auto ? "1" : "0"), [auto]);
+  useEffect(() => store.set("salam-tr-engine", engine), [engine]);
   useEffect(
     () => () => {
       abortRef.current?.abort();
@@ -113,15 +158,12 @@ export default function Translator({ notify }: { notify: Notify }) {
       const ctrl = new AbortController();
       abortRef.current = ctrl;
 
-      let source = s ?? src;
-      if (source === "auto") {
-        source = detectLang(value);
-        setDetected(source);
-      } else {
-        setDetected("");
-      }
+      const source = s ?? src; // ممکن است "auto" باشد
+      const guess = source === "auto" ? detectLang(value) : source;
+      if (source !== "auto") setDetected("");
+
       let target = t ?? tgt;
-      if (source === target) {
+      if (guess === target) {
         target = target === "fa" ? "en" : "fa";
         setTgt(target);
         notify(`زبان مقصد خودکار به «${langByCode(target).fa}» تغییر کرد`, "info");
@@ -131,17 +173,24 @@ export default function Translator({ notify }: { notify: Notify }) {
       setProgress({ done: 0, total: 1 });
       try {
         const res = await translateText(value, source, target, {
+          engine,
           email: email || undefined,
           signal: ctrl.signal,
           onProgress: (done, total) => setProgress({ done, total }),
+          onFallback: (failed) =>
+            notify(`${engineName(failed)} پاسخ نداد؛ با MyMemory ترجمه می‌شود`, "info"),
         });
         setOutput(res.text);
         setAlternatives(res.alternatives);
+        setUsedEngine(res.engine);
+        if (source === "auto") setDetected(res.detected);
         setStats(recordTranslation(value.length));
+
+        const histSrc = isKnownLang(res.detected) ? res.detected : "auto";
         setHistory((prev) => {
           if (
             prev[0]?.sourceText === value.slice(0, 500) &&
-            prev[0]?.src === source &&
+            prev[0]?.src === histSrc &&
             prev[0]?.tgt === target
           )
             return prev;
@@ -150,12 +199,13 @@ export default function Translator({ notify }: { notify: Notify }) {
               typeof crypto !== "undefined" && "randomUUID" in crypto
                 ? crypto.randomUUID()
                 : String(Date.now()),
-            src: source,
+            src: histSrc,
             tgt: target,
             sourceText: value.slice(0, 500),
             translatedText: res.text.slice(0, 500),
             time: Date.now(),
             fav: false,
+            engine: res.engine,
           };
           const next = [item, ...prev].slice(0, 100);
           saveHistory(next);
@@ -164,18 +214,20 @@ export default function Translator({ notify }: { notify: Notify }) {
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
         if (e instanceof TranslateError && e.kind === "quota") {
-          notify("سهمیه روزانه ترجمه تمام شد! ایمیلت را ثبت کن تا چند برابر شود", "error");
+          notify("سهمیه روزانه MyMemory تمام شد! ایمیلت را ثبت کن یا موتور را روی «گوگل» بگذار", "error");
           setShowEmail(true);
+        } else if (e instanceof TranslateError && e.kind === "blocked") {
+          notify("گوگل موقتاً دسترسی را محدود کرده؛ موتور را روی «خودکار» یا MyMemory بگذار", "error");
         } else if (e instanceof TranslateError && e.kind === "network") {
-          notify("اتصال اینترنت را بررسی کن و دوباره تلاش کن", "error");
+          notify("اتصال اینترنت را بررسی کن یا موتور ترجمه را عوض کن", "error");
         } else {
-          notify("خطایی رخ داد؛ دوباره تلاش کن", "error");
+          notify("خطایی رخ داد؛ دوباره تلاش کن یا موتور ترجمه را عوض کن", "error");
         }
       } finally {
         if (abortRef.current === ctrl) setLoading(false);
       }
     },
-    [input, src, tgt, email, notify]
+    [input, src, tgt, engine, email, notify]
   );
 
   // auto translate (debounced)
@@ -191,14 +243,18 @@ export default function Translator({ notify }: { notify: Notify }) {
       void doTranslate();
     }, 900);
     return () => clearTimeout(t);
-  }, [input, src, tgt, auto, doTranslate]);
+  }, [input, src, tgt, auto, engine, doTranslate]);
 
   const swap = () => {
     stopSpeak();
     setSpeaking(null);
     if (src === "auto") {
       const newTgt =
-        detected && detected !== tgt ? detected : tgt === "fa" ? "en" : "fa";
+        detected && detected !== tgt && isKnownLang(detected)
+          ? detected
+          : tgt === "fa"
+            ? "en"
+            : "fa";
       setSrc(tgt);
       setTgt(newTgt);
     } else {
@@ -392,6 +448,54 @@ export default function Translator({ notify }: { notify: Notify }) {
           <LanguageSelect value={tgt} onChange={setTgt} />
         </div>
 
+        {/* engine selector */}
+        <div className="border-b border-pine-900/8 px-3 py-3 sm:px-4 dark:border-white/10">
+          <div className="flex items-center gap-1.5 text-[13px] font-black text-ink/50 dark:text-white/50">
+            <Cpu className="h-4 w-4 text-emerald-500" />
+            موتور ترجمه
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {ENGINES.map((e) => {
+              const active = engine === e.id;
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  onClick={() => setEngine(e.id)}
+                  title={e.desc}
+                  aria-pressed={active}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-start transition active:scale-[0.98]",
+                    active
+                      ? "bg-emerald-500/10 ring-2 ring-emerald-500 dark:bg-emerald-400/10"
+                      : "bg-cream ring-1 ring-pine-900/8 hover:bg-sand dark:bg-white/6 dark:ring-white/10 dark:hover:bg-white/10"
+                  )}
+                >
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white shadow-sm ring-1 ring-pine-900/8 dark:bg-white/10 dark:ring-white/10">
+                    <EngineIcon id={e.id} className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span
+                      className={cn(
+                        "block truncate text-[14px] font-black",
+                        active ? "text-pine-950 dark:text-white" : "text-ink/75 dark:text-white/75"
+                      )}
+                    >
+                      {e.label}
+                    </span>
+                    <span className="hidden truncate text-[11px] font-medium text-ink/45 sm:block dark:text-white/45">
+                      {e.desc}
+                    </span>
+                  </span>
+                  {active && (
+                    <Check className="mr-auto h-4 w-4 shrink-0 text-emerald-500" strokeWidth={3} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* panes */}
         <div className="grid lg:grid-cols-2">
           {/* source */}
@@ -499,8 +603,14 @@ export default function Translator({ notify }: { notify: Notify }) {
           {/* target */}
           <div className="flex flex-col border-pine-900/8 p-4 sm:p-5 lg:border-r dark:border-white/10">
             <div className="flex min-h-8 items-center justify-between gap-2">
-              <span className="text-[13px] font-black text-ink/45 dark:text-white/45">
-                ترجمه ({langByCode(tgt).fa})
+              <span className="flex min-w-0 items-center gap-2 text-[13px] font-black text-ink/45 dark:text-white/45">
+                <span className="truncate">ترجمه ({langByCode(tgt).fa})</span>
+                {usedEngine && output && !loading && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-black text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
+                    <EngineIcon id={usedEngine} className="h-3 w-3" />
+                    با {engineName(usedEngine)}
+                  </span>
+                )}
               </span>
               <div className="flex items-center gap-1.5">
                 <button
@@ -606,15 +716,17 @@ export default function Translator({ notify }: { notify: Notify }) {
             </span>
             ترجمه خودکار
           </button>
-          <button
-            onClick={() => setShowEmail((v) => !v)}
-            className="flex items-center gap-1.5 text-sm font-black text-ink/70 transition hover:text-clay-600 dark:text-white/70 dark:hover:text-gold-400"
-          >
-            <Mail className="h-4 w-4" />
-            افزایش سهمیه
-            {email && <Check className="h-4 w-4 text-emerald-500" />}
-            <ChevronDown className={cn("h-4 w-4 transition-transform", showEmail && "rotate-180")} />
-          </button>
+          {engine !== "google" && (
+            <button
+              onClick={() => setShowEmail((v) => !v)}
+              className="flex items-center gap-1.5 text-sm font-black text-ink/70 transition hover:text-clay-600 dark:text-white/70 dark:hover:text-gold-400"
+            >
+              <Mail className="h-4 w-4" />
+              افزایش سهمیه MyMemory
+              {email && <Check className="h-4 w-4 text-emerald-500" />}
+              <ChevronDown className={cn("h-4 w-4 transition-transform", showEmail && "rotate-180")} />
+            </button>
+          )}
 
           <div className="flex items-center gap-3 sm:mr-auto">
             {loading && progress.total > 1 && (
