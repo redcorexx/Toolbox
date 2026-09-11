@@ -11,9 +11,11 @@ import {
   Zap,
 } from "lucide-react";
 import { GithubIcon } from "./icons";
-import { toFa, type Notify } from "../lib/translator";
+import { useI18n } from "../lib/i18n";
+import type { Notify } from "../lib/translator";
 
 function CodeBlock({ code, notify }: { code: string; notify: Notify }) {
+  const { t } = useI18n();
   const [done, setDone] = useState(false);
   const copy = async () => {
     try {
@@ -27,7 +29,7 @@ function CodeBlock({ code, notify }: { code: string; notify: Notify }) {
       ta.remove();
     }
     setDone(true);
-    notify("دستورات کپی شد", "success");
+    notify(t("n_cmds_copied"), "success");
     setTimeout(() => setDone(false), 1500);
   };
   return (
@@ -37,7 +39,7 @@ function CodeBlock({ code, notify }: { code: string; notify: Notify }) {
         className="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-white/20"
       >
         {done ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-        {done ? "کپی شد" : "کپی"}
+        {done ? t("copied") : t("copy")}
       </button>
       <pre className="overflow-x-auto p-4 pt-11 font-mono text-[13px] leading-7 text-emerald-200">
         {code}
@@ -47,22 +49,11 @@ function CodeBlock({ code, notify }: { code: string; notify: Notify }) {
 }
 
 export function Features() {
+  const { t } = useI18n();
   const items = [
-    {
-      icon: Zap,
-      title: "دو موتور ترجمه: گوگل و MyMemory",
-      desc: "بین موتور گوگل (کیفیت بالا) و MyMemory انتخاب کن، یا حالت خودکار را بگذار تا اگر یکی جواب نداد، دیگری ترجمه کند. متن‌های طولانی هم خودکار تکه‌تکه ترجمه می‌شوند.",
-    },
-    {
-      icon: ShieldCheck,
-      title: "حریم خصوصی تو دست خودته",
-      desc: "تاریخچه، علاقه‌مندی‌ها و تنظیمات فقط داخل مرورگر خودت (LocalStorage) ذخیره می‌شود و هیچ سروری آن‌ها را نمی‌بیند.",
-    },
-    {
-      icon: GithubIcon,
-      title: "متن‌باز و آماده گیت‌هاب",
-      desc: "خروجی نهایی فقط یک فایل HTML است؛ روی گیت‌هاب پیجز، Netlify یا هر هاست دیگری بدون هیچ تنظیمی اجرا می‌شود.",
-    },
+    { icon: Zap, title: t("f1_title"), desc: t("f1_desc") },
+    { icon: ShieldCheck, title: t("f2_title"), desc: t("f2_desc") },
+    { icon: GithubIcon, title: t("f3_title"), desc: t("f3_desc") },
   ];
   return (
     <section className="mx-auto max-w-6xl px-4 pt-16 sm:px-6">
@@ -94,12 +85,17 @@ export function Features() {
 
 const BUILD_CMD = "npm run build";
 const GIT_CMDS = `git add .
-git commit -m "salam translator"
+git commit -m "text translator"
 git branch -M main
 git remote add origin https://github.com/USERNAME/salam-translator.git
 git push -u origin main`;
 
 export function Deploy({ notify }: { notify: Notify }) {
+  const { t, n } = useI18n();
+  const steps = [
+    { title: t("step1_title"), desc: t("step1_desc"), code: BUILD_CMD },
+    { title: t("step2_title"), desc: t("step2_desc"), code: GIT_CMDS },
+  ];
   return (
     <section id="deploy" className="mx-auto max-w-6xl scroll-mt-24 px-4 pt-16 sm:px-6">
       <motion.div
@@ -119,62 +115,42 @@ export function Deploy({ notify }: { notify: Notify }) {
               <Rocket className="h-6 w-6" />
             </span>
             <div>
-              <h2 className="text-2xl font-black">انتشار روی گیت‌هاب در ۳ قدم</h2>
-              <p className="mt-1 text-sm text-white/55">
-                این پروژه آماده انتشار است؛ فقط قدم‌های زیر را برو:
-              </p>
+              <h2 className="text-2xl font-black">{t("deploy_title")}</h2>
+              <p className="mt-1 text-sm text-white/55">{t("deploy_sub")}</p>
             </div>
           </div>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-clay-500 text-lg font-black text-white shadow-lg">
-                {toFa(1)}
-              </span>
-              <h3 className="mt-4 text-[16px] font-black">بیلد بگیر</h3>
-              <p className="mt-1.5 text-[13px] leading-7 text-white/60">
-                با این دستور، کل سایت تبدیل به یک فایل <code dir="ltr" className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[12px] text-gold-400">dist/index.html</code> می‌شود:
-              </p>
-              <CodeBlock code={BUILD_CMD} notify={notify} />
-            </div>
+            {steps.map((s, i) => (
+              <div key={s.title} className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
+                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-clay-500 text-lg font-black text-white shadow-lg">
+                  {n(i + 1)}
+                </span>
+                <h3 className="mt-4 text-[16px] font-black">{s.title}</h3>
+                <p className="mt-1.5 text-[13px] leading-7 text-white/60">{s.desc}</p>
+                <CodeBlock code={s.code} notify={notify} />
+              </div>
+            ))}
 
             <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
               <span className="grid h-10 w-10 place-items-center rounded-2xl bg-clay-500 text-lg font-black text-white shadow-lg">
-                {toFa(2)}
+                {n(3)}
               </span>
-              <h3 className="mt-4 text-[16px] font-black">پوش کن به گیت‌هاب</h3>
-              <p className="mt-1.5 text-[13px] leading-7 text-white/60">
-                یک ریپوی جدید بساز، بعد این دستورات را اجرا کن (به‌جای <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[12px] text-gold-400">USERNAME</code> یوزرنیم خودت را بگذار):
-              </p>
-              <CodeBlock code={GIT_CMDS} notify={notify} />
-            </div>
-
-            <div className="rounded-3xl bg-white/5 p-6 ring-1 ring-white/10">
-              <span className="grid h-10 w-10 place-items-center rounded-2xl bg-clay-500 text-lg font-black text-white shadow-lg">
-                {toFa(3)}
-              </span>
-              <h3 className="mt-4 text-[16px] font-black">پیجز را فعال کن</h3>
-              <p className="mt-1.5 text-[13px] leading-7 text-white/60">
-                دو راه داری:
-              </p>
+              <h3 className="mt-4 text-[16px] font-black">{t("step3_title")}</h3>
+              <p className="mt-1.5 text-[13px] leading-7 text-white/60">{t("step3_desc")}</p>
               <ul className="mt-3 space-y-3 text-[13px] leading-7 text-white/75">
                 <li className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
-                  <strong className="text-gold-400">راه آسان:</strong> فایل{" "}
-                  <code dir="ltr" className="font-mono text-[12px]">dist/index.html</code> را
-                  در ریشه ریپو آپلود کن، بعد از مسیر <code className="font-mono text-[12px]" dir="ltr">Settings → Pages → Deploy from branch → main</code> پیجز را روشن کن.
+                  <strong className="text-gold-400">{t("easy_label")}</strong> {t("easy_text")}
                 </li>
                 <li className="rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
-                  <strong className="text-gold-400">راه حرفه‌ای:</strong> با GitHub Actions
-                  روی هر پوش، خودکار بیلد بگیر و روی پیجز منتشر کن.
+                  <strong className="text-gold-400">{t("pro_label")}</strong> {t("pro_text")}
                 </li>
               </ul>
             </div>
           </div>
 
           <p className="mt-6 rounded-2xl bg-emerald-400/10 p-4 text-center text-sm leading-8 font-bold text-emerald-200 ring-1 ring-emerald-400/20">
-            چون خروجی نهایی تک‌فایل است، روی آدرس‌هایی مثل{" "}
-            <code dir="ltr" className="font-mono">username.github.io/repo</code> بدون هیچ
-            تنظیم اضافه‌ای کار می‌کند.
+            {t("single_file_note")}
           </p>
           <div className="mt-5 text-center">
             <a
@@ -182,7 +158,7 @@ export function Deploy({ notify }: { notify: Notify }) {
               className="inline-flex items-center gap-2 rounded-2xl bg-gold-400 px-6 py-3 text-sm font-black text-pine-950 shadow-lg transition hover:-translate-y-0.5 hover:bg-gold-500"
             >
               <FileCode2 className="h-4 w-4" />
-              git بلد نیستی؟ هر ۲۰ فایل را یکی‌یکی از اینجا کپی کن
+              {t("deploy_files_btn")}
             </a>
           </div>
         </div>
@@ -192,6 +168,7 @@ export function Deploy({ notify }: { notify: Notify }) {
 }
 
 export function Footer() {
+  const { t } = useI18n();
   const year = new Date().getFullYear(); // سال میلادی با ارقام انگلیسی، مثل 2026
   return (
     <footer className="mt-16 border-t border-pine-900/8 dark:border-white/8">
@@ -201,14 +178,14 @@ export function Footer() {
             <Languages className="h-4 w-4" />
           </span>
           <span className="text-[15px] font-black text-pine-950 dark:text-white">
-            مترجم متن
+            {t("brand")}
           </span>
         </div>
         <p className="text-[13px] font-medium leading-7 text-ink/50 dark:text-white/50">
-          قدرت‌گرفته از موتورهای ترجمه گوگل و MyMemory • تاریخچه فقط در مرورگر تو ذخیره می‌شود
+          {t("footer_powered")}
         </p>
         <p className="flex items-center gap-1.5 text-[13px] font-bold text-ink/60 dark:text-white/60">
-          <span dir="ltr">{year}</span> • ساخته‌شده با
+          <span dir="ltr">{year}</span> • {t("footer_made")}
           <Heart className="h-4 w-4 fill-clay-500 text-clay-500" />
         </p>
       </div>
