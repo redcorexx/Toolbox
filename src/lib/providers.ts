@@ -314,3 +314,95 @@ export async function testProvider(settings: ApiSettings, signal?: AbortSignal):
   await providerTranslate(settings, "Hello", "en", "fa", signal);
   return Math.round(performance.now() - t0);
 }
+
+/* ---------------- لیست زنده مدل‌ها ---------------- */
+
+export interface ModelInfo {
+  id: string;
+  free: boolean;
+}
+
+/** الگوهایی که مدل‌های غیرمتنی (تصویر، صدا، embedding و…) را حذف می‌کنند */
+const EXCLUDE = /embed|embedding|whisper|tts|audio|dall-e|image|vision-only|moderation|ocr|realtime|transcri|guard|rerank|imagen|veo|aqa|bison|gecko|learnlm|search|computer-use|codestral-mamba/i;
+
+function keepTextModel(id: string, p: ProviderId): boolean {
+  if (EXCLUDE.test(id)) return false;
+  if (p === "openai") return /^(gpt-|o\d|chatgpt-)/.test(id) && !/instruct|preview-\d{4}/.test(id);
+  if (p === "gemini") return /^gemini-/.test(id) && !/-exp-\d{4}|thinking-exp|-8b-exp/.test(id);
+  return true;
+}
+
+/** مدل پیشنهادی هر سرویس (ارزان، سریع و مناسب ترجمه) */
+export function recommendedModel(p: ProviderId, ids: string[]): string {
+  const prefs: Record<ProviderId, RegExp[]> = {
+    gemini: [/^gemini-2\.0-flash$/, /^gemini-2\.\d-flash$/, /flash-lite/, /flash/],
+    openai: [/^gpt-4o-mini$/, /^gpt-4\.1-mini$/, /mini/, /^gpt-4o$/],
+    groq: [/llama-3\.3-70b-versatile/, /llama-3\.1-8b-instant/, /llama/],
+    openrouter: [/llama-3\.3-70b-instruct:free/, /gemini.*flash.*:free/, /:free$/],
+    mistral: [/^mistral-small-latest$/, /open-mistral-nemo/, /small/],
+  };
+  for (const re of prefs[p]) {
+    const hit = ids.find((id) => re.test(id));
+    if (hit) return hit;
+  }
+  return ids[0] ?? providerById(p).models[0];
+}
+
+/** دریافت لیست مدل‌ها مستقیم از سرویس (بعد از تأیید کلید) */
+export async function fetchModels(settings: ApiSettings, signal?: AbortSignal): Promise<ModelInfo[]> {
+  const p = providerById(settings.provider);
+  const key = activeKey(settings);
+  if (!key) throw new ProviderError("unauthorized");
+
+  let ids: string[] = [];
+  let freeSet = new Set<string>();
+
+  if (p.id === "gemini") {
+    const res = await doFetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=200`,
+      { method: "GET" },
+      signal
+    );
+    if (!res.ok) throw new ProviderError(kindFromStatus(res.status), await readError(res));
+    const data = await res.json().catch(() => null);
+    const list: { name?: string; supportedGenerationMethods?: string[] }[] = Array.isArray(data?.models) ? data.models : [];
+    ids = list
+      .filter((m) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
+      .map((m) => String(m.name ?? "").replace(/^models\//, ""))
+      .filter(Boolean);
+  } else {
+    const base = p.endpoint!.replace(/\/chat\/completions$/, "/models");
+    const headers: Record<string, string> = { Authorization: `Bearer ${key}` };
+    if (p.id === "openrouter") {
+      headers["HTTP-Referer"] = typeof location !== "undefined" ? location.origin : "https://github.com";
+      headers["X-Title"] = "Text Translator";
+    }
+    const res = await doFetch(base, { method: "GET", headers }, signal);
+    if (!res.ok) throw new ProviderError(kindFromStatus(res.status), await readError(res));
+    const data = await res.json().catch(() => null);
+    const list: { id?: string; pricing?: { prompt?: string; completion?: string } }[] = Array.isArray(data?.data) ? data.data : [];
+    ids = list.map((m) => String(m.id ?? "")).filter(Boolean);
+    if (p.id === "openrouter") {
+      freeSet = new Set(
+        list
+          .filter((m) => /:free$/.test(String(m.id)) || (m.pricing && Number(m.pricing.prompt) === 0 && Number(m.pricing.completion) === 0))
+          .map((m) => String(m.id))
+      );
+    }
+  }
+
+  const uniq = Array.from(new Set(ids)).filter((id) => keepTextModel(id, p.id));
+  if (!uniq.length) throw new ProviderError("generic");
+
+  const isFree = (id: string) => (p.id === "openrouter" ? freeSet.has(id) : p.free);
+  const rec = recommendedModel(p.id, uniq);
+  uniq.sort((a, b) => {
+    if (a === rec) return -1;
+    if (b === rec) return 1;
+    const fa = isFree(a) ? 0 : 1;
+    const fb = isFree(b) ? 0 : 1;
+    if (fa !== fb) return fa - fb;
+    return a.localeCompare(b);
+  });
+  return uniq.map((id) => ({ id, free: isFree(id) }));
+}
