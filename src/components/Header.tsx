@@ -1,5 +1,6 @@
 import { Globe, Languages, Moon, Sun } from "lucide-react";
 import { GithubIcon } from "./icons";
+import { GITHUB_URL } from "./Sections";
 import { useI18n } from "../lib/i18n";
 
 interface Props {
@@ -48,7 +49,9 @@ export default function Header({ theme, onToggleTheme }: Props) {
 
         <div className="flex items-center gap-2">
           <a
-            href="#deploy"
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="hidden items-center gap-2 rounded-xl bg-pine-950 px-4 py-2.5 text-[13px] font-black text-white shadow-md transition hover:-translate-y-0.5 hover:bg-clay-600 sm:inline-flex dark:bg-gold-400 dark:text-pine-950 dark:hover:bg-gold-500"
           >
             <GithubIcon className="h-4 w-4" />
