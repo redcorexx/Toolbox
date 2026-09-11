@@ -442,14 +442,16 @@ export default function ApiKeyPanel({ settings, onChange, notify }: Props) {
                       {visible.map((m) => {
                         const active = m.id === selected;
                         const rec = m.id === recommended;
+                        const name = shortModel(m.id);
                         return (
                           <button
                             key={m.id}
                             type="button"
                             onClick={() => setSelected(m.id)}
                             aria-pressed={active}
+                            title={m.id}
                             className={cn(
-                              "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-start transition active:scale-[0.99]",
+                              "flex min-w-0 items-center gap-2.5 rounded-xl px-3 py-2 text-start transition active:scale-[0.99]",
                               active
                                 ? "bg-emerald-500/10 ring-2 ring-emerald-500"
                                 : "bg-white ring-1 ring-pine-900/10 hover:ring-pine-900/25 dark:bg-white/8 dark:ring-white/10 dark:hover:ring-white/25"
@@ -457,42 +459,44 @@ export default function ApiKeyPanel({ settings, onChange, notify }: Props) {
                           >
                             <span
                               className={cn(
-                                "grid h-5 w-5 shrink-0 place-items-center rounded-full ring-2 transition",
+                                "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full ring-2 transition",
                                 active ? "bg-emerald-500 ring-emerald-500 text-white" : "ring-ink/25 dark:ring-white/30"
                               )}
                             >
-                              {active && <Check className="h-3 w-3" strokeWidth={4} />}
+                              {active && <Check className="h-2.5 w-2.5" strokeWidth={4} />}
                             </span>
-                            <span className="min-w-0 flex-1">
+                            {/* نام مدل: چپ‌چین، فونت کوچک، شکستن هوشمند در اسم‌های طولانی */}
+                            <span className="min-w-0 flex-1 text-left" dir="ltr">
                               <span
                                 className={cn(
-                                  "block truncate font-mono text-[13px] font-black",
+                                  "block font-mono text-[11px] font-bold leading-4 sm:text-[12px]",
+                                  name.length > 30 ? "break-all" : "truncate",
                                   active ? "text-pine-950 dark:text-white" : "text-ink/80 dark:text-white/80"
                                 )}
-                                dir="ltr"
-                                title={m.id}
                               >
-                                {shortModel(m.id)}
+                                {name}
                               </span>
                               {isOpenRouter && m.id.includes("/") && (
-                                <span className="block truncate text-[11px] text-ink/45 dark:text-white/45" dir="ltr">
+                                <span className="block truncate text-[10px] leading-4 text-ink/45 dark:text-white/45">
                                   {m.id.split("/")[0]}
                                 </span>
                               )}
                             </span>
-                            <span className="flex shrink-0 items-center gap-1">
-                              {m.free && (
-                                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-700 ring-1 ring-emerald-500/20 dark:text-emerald-400">
-                                  {t("api_free")}
-                                </span>
-                              )}
-                              {rec && (
-                                <span className="inline-flex items-center gap-0.5 rounded-full bg-gold-400/20 px-2 py-0.5 text-[10px] font-black text-gold-500 ring-1 ring-gold-500/30">
-                                  <Sparkles className="h-2.5 w-2.5" />
-                                  {t("api_recommended")}
-                                </span>
-                              )}
-                            </span>
+                            {(rec || (isOpenRouter && m.free)) && (
+                              <span className="flex shrink-0 flex-col items-end gap-0.5">
+                                {rec && (
+                                  <span className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-gold-400/20 px-1.5 py-0.5 text-[9px] font-black text-gold-500 ring-1 ring-gold-500/30">
+                                    <Sparkles className="h-2 w-2" />
+                                    {t("api_recommended")}
+                                  </span>
+                                )}
+                                {isOpenRouter && m.free && (
+                                  <span className="whitespace-nowrap rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-black text-emerald-700 ring-1 ring-emerald-500/20 dark:text-emerald-400">
+                                    {t("api_free")}
+                                  </span>
+                                )}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
