@@ -24,8 +24,6 @@ export const dict = {
   /* ---------- هدر ---------- */
   nav_translator: { fa: "مترجم", en: "Translator" },
   nav_history: { fa: "تاریخچه", en: "History" },
-  nav_deploy: { fa: "انتشار در گیت‌هاب", en: "Deploy to GitHub" },
-  nav_source: { fa: "فایل‌های سورس", en: "Source files" },
   github_btn: { fa: "سورس در گیت‌هاب", en: "Source on GitHub" },
   theme_light: { fa: "حالت روشن", en: "Light mode" },
   theme_dark: { fa: "حالت تیره", en: "Dark mode" },
@@ -40,7 +38,6 @@ export const dict = {
     en: "Persian ↔ English plus {n}+ other languages — free, no sign-up, with history and text-to-speech.",
   },
   hero_cta_start: { fa: "شروع ترجمه", en: "Start translating" },
-  hero_cta_files: { fa: "دریافت فایل‌های گیت‌هاب", en: "Get GitHub files" },
 
   /* ---------- مترجم ---------- */
   try_it: { fa: "امتحان کن:", en: "Try:" },
@@ -147,11 +144,6 @@ export const dict = {
   n_email_removed: { fa: "ایمیل حذف شد", en: "Email removed" },
   n_history_cleared: { fa: "تاریخچه پاک شد", en: "History cleared" },
   n_confirm_clear: { fa: "برای تایید پاک‌سازی، دوباره بزن", en: "Tap again to confirm" },
-  n_cmds_copied: { fa: "دستورات کپی شد", en: "Commands copied" },
-  n_file_copied: { fa: "فایل {path} کپی شد", en: "{path} copied" },
-  n_file_downloaded: { fa: "فایل {path} دانلود شد", en: "{path} downloaded" },
-  n_zip_done: { fa: "فایل ZIP همه سورس‌ها دانلود شد", en: "Source ZIP downloaded" },
-  n_zip_err: { fa: "خطا در ساخت ZIP؛ دوباره تلاش کن", en: "Failed to build ZIP; try again" },
 
   /* ---------- انتخاب زبان ---------- */
   auto_detect: { fa: "تشخیص خودکار", en: "Auto-detect" },
@@ -184,76 +176,15 @@ export const dict = {
     fa: "تاریخچه، علاقه‌مندی‌ها و تنظیمات فقط داخل مرورگر خودت (LocalStorage) ذخیره می‌شود و هیچ سروری آن‌ها را نمی‌بیند.",
     en: "History, favorites and settings live only in your browser (LocalStorage) — no server ever sees them.",
   },
-  f3_title: { fa: "متن‌باز و آماده گیت‌هاب", en: "Open source & GitHub-ready" },
+  f3_title: { fa: "ترجمه با هوش مصنوعی، با کلید خودت", en: "AI translation with your own key" },
   f3_desc: {
-    fa: "خروجی نهایی فقط یک فایل HTML است؛ روی گیت‌هاب پیجز، Netlify یا هر هاست دیگری بدون هیچ تنظیمی اجرا می‌شود.",
-    en: "The build is a single HTML file that runs on GitHub Pages, Netlify or any host with zero config.",
+    fa: "کلید API سرویس‌هایی مثل Gemini، OpenAI یا Groq را وارد کن تا با مدل انتخابی‌ات ترجمه‌ای روان‌تر و طبیعی‌تر بگیری. کلید فقط در مرورگر خودت می‌ماند.",
+    en: "Add an API key from Gemini, OpenAI, Groq and more to get smoother, more natural translations from the model you choose. The key never leaves your browser.",
   },
-
-  /* ---------- انتشار ---------- */
-  deploy_title: { fa: "انتشار روی گیت‌هاب در ۳ قدم", en: "Deploy to GitHub in 3 steps" },
-  deploy_sub: { fa: "این پروژه آماده انتشار است؛ فقط قدم‌های زیر را برو:", en: "This project is deploy-ready — just follow these steps:" },
-  step1_title: { fa: "بیلد بگیر", en: "Build it" },
-  step1_desc: { fa: "این دستور کل سایت را به یک فایل dist/index.html تبدیل می‌کند:", en: "This command bundles the whole site into a single dist/index.html:" },
-  step2_title: { fa: "پوش کن به گیت‌هاب", en: "Push to GitHub" },
-  step2_desc: { fa: "یک ریپوی جدید بساز، بعد این دستورات را اجرا کن (به‌جای USERNAME یوزرنیم خودت را بگذار):", en: "Create a new repo, then run these commands (replace USERNAME with yours):" },
-  step3_title: { fa: "پیجز را فعال کن", en: "Enable Pages" },
-  step3_desc: { fa: "دو راه داری:", en: "You have two options:" },
-  easy_label: { fa: "راه آسان:", en: "Easy way:" },
-  easy_text: {
-    fa: "فایل dist/index.html را در ریشه ریپو آپلود کن، بعد از Settings → Pages → Deploy from branch → main پیجز را روشن کن.",
-    en: "upload dist/index.html to the repo root, then enable Pages via Settings → Pages → Deploy from branch → main.",
-  },
-  pro_label: { fa: "راه حرفه‌ای:", en: "Pro way:" },
-  pro_text: { fa: "با GitHub Actions روی هر پوش، خودکار بیلد بگیر و روی پیجز منتشر کن.", en: "let GitHub Actions build and deploy to Pages automatically on every push." },
-  single_file_note: {
-    fa: "چون خروجی نهایی تک‌فایل است، روی آدرس‌هایی مثل username.github.io/repo بدون هیچ تنظیم اضافه‌ای کار می‌کند.",
-    en: "Since the build is a single file, it works at URLs like username.github.io/repo with no extra config.",
-  },
-  deploy_files_btn: { fa: "git بلد نیستی؟ همه فایل‌ها را یکی‌یکی از اینجا کپی کن", en: "Not into git? Copy every file one by one here" },
 
   /* ---------- فوتر ---------- */
   footer_powered: { fa: "قدرت‌گرفته از موتورهای ترجمه گوگل و MyMemory • تاریخچه فقط در مرورگر تو ذخیره می‌شود", en: "Powered by Google & MyMemory • History is stored only in your browser" },
   footer_made: { fa: "ساخته‌شده با", en: "Made with" },
-
-  /* ---------- مرکز کپی فایل‌ها ---------- */
-  src_badge: { fa: "مرکز کپی فایل‌ها", en: "File copy center" },
-  src_title: { fa: "هر {n} فایل، به ترتیب، آماده کپی", en: "All {n} files, in order, ready to copy" },
-  src_desc: {
-    fa: "بدون نیاز به git و ترمینال؛ از همین‌جا یکی‌یکی کپی کن و در ریپوی گیت‌هابت بچسبان. ترتیب کارت‌ها همان ترتیب پیشنهادی ساخت فایل‌هاست.",
-    en: "No git or terminal needed — copy each file here and paste it into your GitHub repo. Cards are in the recommended creation order.",
-  },
-  zip_btn: { fa: "دانلود یک‌جای همه فایل‌ها (ZIP)", en: "Download all files (ZIP)" },
-  zip_building: { fa: "در حال ساخت ZIP...", en: "Building ZIP..." },
-  zip_hint: {
-    fa: "راحت‌ترین راه: ZIP را دانلود کن، از حالت فشرده خارج کن، بعد همه فایل‌ها و پوشه‌ها را یک‌جا با درگ‌ودراپ داخل ریپوی گیت‌هابت آپلود کن.",
-    en: "Easiest way: download the ZIP, extract it, then drag & drop all files and folders into your GitHub repo at once.",
-  },
-  steps_title: { fa: "روش کپی دستی در سایت گیت‌هاب (بدون git)", en: "Manual copy on github.com (no git)" },
-  step_1: { fa: "در سایت گیت‌هاب، یک ریپوی جدید و Public بساز (اسم پیشنهادی: salam-translator).", en: "On GitHub, create a new Public repository (suggested name: salam-translator)." },
-  step_2: { fa: "داخل ریپو، دکمه Add file و بعد Create new file را بزن.", en: "Inside the repo, click “Add file” → “Create new file”." },
-  step_3: { fa: "در کادر نام فایل، دقیقاً همان مسیری را بنویس که بالای هر کارت هست — مثلاً src/App.tsx (گیت‌هاب خودش پوشه‌ها را می‌سازد).", en: "In the filename box, type the exact path shown on each card — e.g. src/App.tsx (GitHub creates the folders for you)." },
-  step_4: { fa: "با دکمه «کپی» همان کارت، محتوای فایل را بردار، در کادر بزرگ بچسبان و Commit changes را بزن.", en: "Click “Copy” on that card, paste the content into the big editor and hit “Commit changes”." },
-  step_5: { fa: "به همین ترتیب برای هر {n} فایل تکرار کن و هر کدام را که گذاشتی، دکمه «گذاشتم» را بزن تا چیزی جا نماند.", en: "Repeat for all {n} files, ticking “Uploaded” on each so nothing is missed." },
-  step_6: { fa: "در آخر از مسیر Settings ← Pages گزینه GitHub Actions را انتخاب کن؛ بعد از ۱-۲ دقیقه سایتت بالا می‌آید.", en: "Finally go to Settings → Pages and choose GitHub Actions; your site goes live in 1–2 minutes." },
-  steps_note: {
-    fa: "نکته: فایل‌هایی که با نقطه شروع می‌شوند (.gitignore) یا داخل پوشه‌اند (.github/workflows/...) هم دقیقاً با همین روش و با همان مسیر کامل ساخته می‌شوند — فقط مسیر کامل را در کادر نام فایل بنویس.",
-    en: "Note: files starting with a dot (.gitignore) or inside folders (.github/workflows/...) are created the same way — just type the full path in the filename box.",
-  },
-  progress: { fa: "{done} از {total} فایل گذاشته شده", en: "{done} of {total} files uploaded" },
-  pct: { fa: "({n}٪)", en: "({n}%)" },
-  show_all: { fa: "نمایش همه کدها", en: "Show all code" },
-  hide_all: { fa: "بستن همه کدها", en: "Hide all code" },
-  reset: { fa: "شروع دوباره", en: "Reset" },
-  all_done: { fa: "آفرین! همه فایل‌ها گذاشته شد. حالا فقط کافی است از Settings ← Pages گزینه GitHub Actions را فعال کنی.", en: "All files uploaded — nice! Now just enable GitHub Actions under Settings → Pages." },
-  lines: { fa: "{n} خط", en: "{n} lines" },
-  changed_badge: { fa: "🔄 تغییر کرده: {what}", en: "🔄 Changed: {what}" },
-  new_badge: { fa: "✨ فایل جدید: {what}", en: "✨ New file: {what}" },
-  done_yes: { fa: "گذاشتم", en: "Uploaded" },
-  done_ask: { fa: "گذاشتم؟", en: "Uploaded?" },
-  download_file: { fa: "دانلود فایل", en: "Download file" },
-  show_code: { fa: "نمایش کد", en: "Show code" },
-  hide: { fa: "بستن", en: "Hide" },
 } as const;
 
 export type DictKey = keyof typeof dict;
