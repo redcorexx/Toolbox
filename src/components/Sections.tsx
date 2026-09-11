@@ -50,8 +50,8 @@ export function Features() {
   const items = [
     {
       icon: Zap,
-      title: "سریع، رایگان، بدون ثبت‌نام",
-      desc: "فقط بنویس و ترجمه بگیر. با API آزاد MyMemory بیش از ۲۰ زبان پشتیبانی می‌شود؛ متن‌های طولانی هم خودکار تکه‌تکه ترجمه می‌شوند.",
+      title: "دو موتور ترجمه: گوگل و MyMemory",
+      desc: "بین موتور گوگل (کیفیت بالا) و MyMemory انتخاب کن، یا حالت خودکار را بگذار تا اگر یکی جواب نداد، دیگری ترجمه کند. متن‌های طولانی هم خودکار تکه‌تکه ترجمه می‌شوند.",
     },
     {
       icon: ShieldCheck,
@@ -192,7 +192,7 @@ export function Deploy({ notify }: { notify: Notify }) {
 }
 
 export function Footer() {
-  const year = new Date().toLocaleDateString("fa-IR", { year: "numeric" });
+  const year = new Date().getFullYear(); // سال میلادی با ارقام انگلیسی، مثل 2026
   return (
     <footer className="mt-16 border-t border-pine-900/8 dark:border-white/8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-center sm:flex-row sm:text-start sm:px-6">
@@ -201,14 +201,14 @@ export function Footer() {
             <Languages className="h-4 w-4" />
           </span>
           <span className="text-[15px] font-black text-pine-950 dark:text-white">
-            مترجم سلام
+            مترجم متن
           </span>
         </div>
         <p className="text-[13px] font-medium leading-7 text-ink/50 dark:text-white/50">
-          قدرت‌گرفته از API رایگان MyMemory • تاریخچه فقط در مرورگر تو ذخیره می‌شود
+          قدرت‌گرفته از موتورهای ترجمه گوگل و MyMemory • تاریخچه فقط در مرورگر تو ذخیره می‌شود
         </p>
         <p className="flex items-center gap-1.5 text-[13px] font-bold text-ink/60 dark:text-white/60">
-          {year} • ساخته‌شده با
+          <span dir="ltr">{year}</span> • ساخته‌شده با
           <Heart className="h-4 w-4 fill-clay-500 text-clay-500" />
         </p>
       </div>
