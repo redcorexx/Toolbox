@@ -14,6 +14,9 @@ export interface PdfInput {
   src: string;
   tgt: string;
   engine: EngineUsed;
+  /** برای موتور custom: نام سرویس و مدل (مثلاً «Google Gemini» / «gemini-2.0-flash») */
+  providerName?: string;
+  modelName?: string;
   i18n: I18n;
 }
 
@@ -503,7 +506,7 @@ class Painter {
   }
 
   /* ----- کارت اطلاعات (موتور، زبان‌ها، تاریخ) ----- */
-  async infoCard(src: string, tgt: string, engine: EngineUsed) {
+  async infoCard(src: string, tgt: string, engine: EngineUsed, providerName?: string, modelName?: string) {
     const { t, ln, isFa } = this.i18n;
     await this.ensure(INFO_H);
     const ctx = this.ctx;
@@ -528,6 +531,18 @@ class Painter {
         ctx.fillStyle = "#ffffff";
         ctx.fill();
         googleG(ctx, lx + ls / 2 - 18, ly + ls / 2 - 18, 36);
+      } else if (engine === "custom") {
+        // نشان طلایی با حرف اول نام سرویس
+        rrect(ctx, lx, ly, ls, ls, 18);
+        const g = ctx.createLinearGradient(lx, ly, lx + ls, ly + ls);
+        g.addColorStop(0, "#ddb254");
+        g.addColorStop(1, "#c99a2e");
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.font = font(900, 30);
+        ctx.fillStyle = "#0e312e";
+        ctx.textBaseline = "middle";
+        drawText(ctx, (providerName ?? "AI").trim().charAt(0).toUpperCase(), lx + ls / 2, ly + ls / 2 + 1, "center", false);
       } else {
         rrect(ctx, lx, ly, ls, ls, 18);
         const g = ctx.createLinearGradient(lx, ly, lx + ls, ly + ls);
@@ -547,7 +562,13 @@ class Painter {
       drawText(ctx, t("target_label", { lang: ln(tgt) }), tx, y + 50, "left", isFa);
       ctx.font = font(500, 22);
       ctx.fillStyle = C.muted;
-      drawText(ctx, engine === "google" ? "Google Translate" : "MyMemory Translated", tx, y + 86, "left", false);
+      const engineLine =
+        engine === "google"
+          ? "Google Translate"
+          : engine === "custom"
+            ? [providerName ?? "AI", modelName].filter(Boolean).join(" • ")
+            : "MyMemory Translated";
+      drawText(ctx, engineLine, tx, y + 86, "left", false);
 
       hline(ctx, x + 24, x + w - 24, y + 128, C.cardLine);
 
@@ -723,7 +744,7 @@ async function layout(p: Painter, input: PdfInput) {
   p.header();
   await p.textCard(input.sourceText.trim() || "—", t("source_label"), input.src, 36);
   await p.textCard(input.translatedText.trim() || "—", t("pdf_translation"), input.tgt, 40);
-  await p.infoCard(input.src, input.tgt, input.engine);
+  await p.infoCard(input.src, input.tgt, input.engine, input.providerName, input.modelName);
   p.footer();
   await p.finish();
 }
