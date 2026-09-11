@@ -27,6 +27,7 @@ import cssRaw from "../index.css?raw";
 import envRaw from "../vite-env.d.ts?raw";
 import libRaw from "../lib/translator.ts?raw";
 import i18nRaw from "../lib/i18n.ts?raw";
+import pdfRaw from "../lib/pdf.ts?raw";
 import cnRaw from "../utils/cn.ts?raw";
 import headerRaw from "./Header.tsx?raw";
 import langSelectRaw from "./LanguageSelect.tsx?raw";
@@ -50,29 +51,28 @@ interface FileEntry {
   isNew?: boolean;
 }
 
-const BILINGUAL: Bi = { fa: "دوزبانه شد (فارسی/انگلیسی)", en: "now bilingual (FA/EN)" };
-
 /* ترتیب پیشنهادی ساخت فایل‌ها در گیت‌هاب */
 const FILES: FileEntry[] = [
   { path: "package.json", code: pkgRaw },
   { path: "vite.config.ts", code: viteConfigRaw },
   { path: "tsconfig.json", code: tsconfigRaw },
-  { path: "index.html", code: indexHtmlRaw, changed: { fa: "حفظ زبان انتخابی", en: "remembers UI language" } },
+  { path: "index.html", code: indexHtmlRaw },
   { path: "src/main.tsx", code: mainRaw },
-  { path: "src/App.tsx", code: appRaw, changed: BILINGUAL },
+  { path: "src/App.tsx", code: appRaw },
   { path: "src/index.css", code: cssRaw },
   { path: "src/vite-env.d.ts", code: envRaw },
-  { path: "src/lib/translator.ts", code: libRaw, changed: BILINGUAL },
-  { path: "src/lib/i18n.ts", code: i18nRaw, isNew: true, changed: { fa: "دیکشنری فارسی/انگلیسی", en: "FA/EN dictionary" } },
+  { path: "src/lib/translator.ts", code: libRaw },
+  { path: "src/lib/i18n.ts", code: i18nRaw, changed: { fa: "متن‌های PDF", en: "PDF strings" } },
+  { path: "src/lib/pdf.ts", code: pdfRaw, isNew: true, changed: { fa: "موتور ساخت PDF", en: "PDF export engine" } },
   { path: "src/utils/cn.ts", code: cnRaw },
-  { path: "src/components/Header.tsx", code: headerRaw, changed: { fa: "دکمه تغییر زبان", en: "language toggle button" } },
-  { path: "src/components/LanguageSelect.tsx", code: langSelectRaw, changed: BILINGUAL },
-  { path: "src/components/HistoryPanel.tsx", code: historyRaw, changed: BILINGUAL },
-  { path: "src/components/Translator.tsx", code: translatorRaw, changed: BILINGUAL },
-  { path: "src/components/Sections.tsx", code: sectionsRaw, changed: BILINGUAL },
-  { path: "src/components/icons.tsx", code: iconsRaw },
-  { path: "src/components/SourceExport.tsx", code: sourceExportRaw, changed: BILINGUAL },
-  { path: "README.md", code: readmeRaw, changed: BILINGUAL },
+  { path: "src/components/Header.tsx", code: headerRaw, changed: { fa: "لینک گیت‌هاب واقعی", en: "real GitHub link" } },
+  { path: "src/components/LanguageSelect.tsx", code: langSelectRaw },
+  { path: "src/components/HistoryPanel.tsx", code: historyRaw },
+  { path: "src/components/Translator.tsx", code: translatorRaw, changed: { fa: "دکمه دانلود PDF", en: "PDF download button" } },
+  { path: "src/components/Sections.tsx", code: sectionsRaw, changed: { fa: "لوگوی گیت‌هاب و تلگرام در فوتر", en: "GitHub & Telegram logos in footer" } },
+  { path: "src/components/icons.tsx", code: iconsRaw, changed: { fa: "آیکون تلگرام", en: "Telegram icon" } },
+  { path: "src/components/SourceExport.tsx", code: sourceExportRaw, changed: { fa: "افزودن فایل pdf.ts به لیست", en: "pdf.ts added to the list" } },
+  { path: "README.md", code: readmeRaw, changed: { fa: "معرفی خروجی PDF", en: "PDF export mentioned" } },
   { path: ".gitignore", code: gitignoreRaw },
   { path: ".github/workflows/deploy.yml", code: deployRaw },
 ];
