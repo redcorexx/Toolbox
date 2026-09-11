@@ -74,6 +74,18 @@ export const dict = {
   stat_chars: { fa: "حروف ترجمه‌شده", en: "Characters translated" },
   stat_langs: { fa: "زبان پشتیبانی‌شده", en: "Supported languages" },
 
+  /* ---------- خروجی PDF ---------- */
+  btn_pdf: { fa: "دانلود ترجمه به‌صورت PDF", en: "Download translation as PDF" },
+  pdf_subtitle: { fa: "ترجمه سریع و دقیق", en: "Fast & accurate translation" },
+  pdf_translation: { fa: "ترجمه", en: "Translation" },
+  pdf_source_lang: { fa: "زبان مبدأ", en: "Source language" },
+  pdf_target_lang: { fa: "زبان مقصد", en: "Target language" },
+  pdf_datetime: { fa: "تاریخ و زمان", en: "Date & time" },
+  pdf_continued: { fa: "ادامه", en: "continued" },
+  pdf_page: { fa: "صفحه {a} از {b}", en: "Page {a} of {b}" },
+  n_pdf_done: { fa: "فایل PDF ترجمه دانلود شد", en: "Translation PDF downloaded" },
+  n_pdf_err: { fa: "ساخت PDF ناموفق بود؛ دوباره تلاش کن", en: "Couldn't create the PDF; please try again" },
+
   /* ---------- اعلان‌ها ---------- */
   n_target_changed: { fa: "زبان مقصد خودکار به «{lang}» تغییر کرد", en: "Target language switched to “{lang}”" },
   n_fallback: { fa: "{engine} پاسخ نداد؛ با MyMemory ترجمه می‌شود", en: "{engine} didn't respond; falling back to MyMemory" },
