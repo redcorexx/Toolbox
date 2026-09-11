@@ -12,7 +12,8 @@ import {
   Loader2,
   RotateCcw,
 } from "lucide-react";
-import { toFa, type Notify } from "../lib/translator";
+import type { Notify } from "../lib/translator";
+import { useI18n, type DictKey } from "../lib/i18n";
 import { cn } from "../utils/cn";
 
 /* محتوای خام همه فایل‌ها — مستقیم از سورس پروژه خوانده می‌شود */
@@ -25,6 +26,7 @@ import appRaw from "../App.tsx?raw";
 import cssRaw from "../index.css?raw";
 import envRaw from "../vite-env.d.ts?raw";
 import libRaw from "../lib/translator.ts?raw";
+import i18nRaw from "../lib/i18n.ts?raw";
 import cnRaw from "../utils/cn.ts?raw";
 import headerRaw from "./Header.tsx?raw";
 import langSelectRaw from "./LanguageSelect.tsx?raw";
@@ -37,31 +39,40 @@ import readmeRaw from "../../README.md?raw";
 import gitignoreRaw from "../../.gitignore?raw";
 import deployRaw from "../../.github/workflows/deploy.yml?raw";
 
+type Bi = { fa: string; en: string };
+
 interface FileEntry {
   path: string;
   code: string;
+  /** در آخرین نسخه تغییر کرده — اگر قبلاً آپلود کرده‌ای باید جایگزین شود */
+  changed?: Bi;
+  /** فایل کاملاً جدید است */
+  isNew?: boolean;
 }
+
+const BILINGUAL: Bi = { fa: "دوزبانه شد (فارسی/انگلیسی)", en: "now bilingual (FA/EN)" };
 
 /* ترتیب پیشنهادی ساخت فایل‌ها در گیت‌هاب */
 const FILES: FileEntry[] = [
   { path: "package.json", code: pkgRaw },
   { path: "vite.config.ts", code: viteConfigRaw },
   { path: "tsconfig.json", code: tsconfigRaw },
-  { path: "index.html", code: indexHtmlRaw },
+  { path: "index.html", code: indexHtmlRaw, changed: { fa: "حفظ زبان انتخابی", en: "remembers UI language" } },
   { path: "src/main.tsx", code: mainRaw },
-  { path: "src/App.tsx", code: appRaw },
+  { path: "src/App.tsx", code: appRaw, changed: BILINGUAL },
   { path: "src/index.css", code: cssRaw },
   { path: "src/vite-env.d.ts", code: envRaw },
-  { path: "src/lib/translator.ts", code: libRaw },
+  { path: "src/lib/translator.ts", code: libRaw, changed: BILINGUAL },
+  { path: "src/lib/i18n.ts", code: i18nRaw, isNew: true, changed: { fa: "دیکشنری فارسی/انگلیسی", en: "FA/EN dictionary" } },
   { path: "src/utils/cn.ts", code: cnRaw },
-  { path: "src/components/Header.tsx", code: headerRaw },
-  { path: "src/components/LanguageSelect.tsx", code: langSelectRaw },
-  { path: "src/components/HistoryPanel.tsx", code: historyRaw },
-  { path: "src/components/Translator.tsx", code: translatorRaw },
-  { path: "src/components/Sections.tsx", code: sectionsRaw },
+  { path: "src/components/Header.tsx", code: headerRaw, changed: { fa: "دکمه تغییر زبان", en: "language toggle button" } },
+  { path: "src/components/LanguageSelect.tsx", code: langSelectRaw, changed: BILINGUAL },
+  { path: "src/components/HistoryPanel.tsx", code: historyRaw, changed: BILINGUAL },
+  { path: "src/components/Translator.tsx", code: translatorRaw, changed: BILINGUAL },
+  { path: "src/components/Sections.tsx", code: sectionsRaw, changed: BILINGUAL },
   { path: "src/components/icons.tsx", code: iconsRaw },
-  { path: "src/components/SourceExport.tsx", code: sourceExportRaw },
-  { path: "README.md", code: readmeRaw },
+  { path: "src/components/SourceExport.tsx", code: sourceExportRaw, changed: BILINGUAL },
+  { path: "README.md", code: readmeRaw, changed: BILINGUAL },
   { path: ".gitignore", code: gitignoreRaw },
   { path: ".github/workflows/deploy.yml", code: deployRaw },
 ];
@@ -77,16 +88,10 @@ function loadDone(): string[] {
   }
 }
 
-const STEPS = [
-  "در سایت گیت‌هاب، یک ریپوی جدید و Public بساز (اسم پیشنهادی: salam-translator).",
-  "داخل ریپو، دکمه Add file و بعد Create new file را بزن.",
-  "در کادر نام فایل، دقیقاً همان مسیری را بنویس که بالای هر کارت هست — مثلاً src/App.tsx (گیت‌هاب خودش پوشه‌ها را می‌سازد).",
-  "با دکمه «کپی» همان کارت، محتوای فایل را بردار، در کادر بزرگ بچسبان و Commit changes را بزن.",
-  "به همین ترتیب برای هر ۲۰ فایل تکرار کن و هر کدام را که گذاشتی، دکمه «گذاشتم» را بزن تا چیزی جا نماند.",
-  "در آخر از مسیر Settings ← Pages گزینه GitHub Actions را انتخاب کن؛ بعد از ۱-۲ دقیقه سایتت بالا می‌آید.",
-];
+const STEP_KEYS: DictKey[] = ["step_1", "step_2", "step_3", "step_4", "step_5", "step_6"];
 
 export default function SourceExport({ notify }: { notify: Notify }) {
+  const { t, n, lang } = useI18n();
   const [done, setDone] = useState<string[]>(loadDone);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState("");
@@ -133,7 +138,7 @@ export default function SourceExport({ notify }: { notify: Notify }) {
       ta.remove();
     }
     setCopied(f.path);
-    notify(`فایل ${f.path} کپی شد`, "success");
+    notify(t("n_file_copied", { path: f.path }), "success");
     setTimeout(() => setCopied((p) => (p === f.path ? "" : p)), 1600);
   };
 
@@ -147,7 +152,7 @@ export default function SourceExport({ notify }: { notify: Notify }) {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    notify(`فایل ${f.path} دانلود شد`, "success");
+    notify(t("n_file_downloaded", { path: f.path }), "success");
   };
 
   const downloadZip = async () => {
@@ -164,29 +169,29 @@ export default function SourceExport({ notify }: { notify: Notify }) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      notify("فایل ZIP همه سورس‌ها دانلود شد", "success");
+      notify(t("n_zip_done"), "success");
     } catch {
-      notify("خطا در ساخت ZIP؛ دوباره تلاش کن", "error");
+      notify(t("n_zip_err"), "error");
     } finally {
       setZipping(false);
     }
   };
 
   const pct = Math.round((done.length / FILES.length) * 100);
+  const total = n(FILES.length);
 
   return (
     <section id="source" className="mx-auto max-w-6xl scroll-mt-24 px-4 pt-16 sm:px-6">
       <div className="text-center">
         <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-1.5 text-[13px] font-black text-pine-800 shadow-sm ring-1 ring-pine-900/10 dark:bg-white/8 dark:text-gold-400 dark:ring-white/10">
           <FileCode2 className="h-4 w-4" />
-          مرکز کپی فایل‌ها
+          {t("src_badge")}
         </span>
         <h2 className="mt-4 text-3xl font-black leading-snug text-pine-950 sm:text-4xl dark:text-white">
-          هر {toFa(FILES.length)} فایل، به ترتیب، آماده کپی
+          {t("src_title", { n: total })}
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-8 text-ink/60 dark:text-white/60">
-          بدون نیاز به git و ترمینال؛ از همین‌جا یکی‌یکی کپی کن و در ریپوی
-          گیت‌هابت بچسبان. ترتیب کارت‌ها همان ترتیب پیشنهادی ساخت فایل‌هاست.
+          {t("src_desc")}
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
           <button
@@ -199,12 +204,11 @@ export default function SourceExport({ notify }: { notify: Notify }) {
             ) : (
               <FileArchive className="h-4 w-4" />
             )}
-            {zipping ? "در حال ساخت ZIP..." : "دانلود یک‌جای همه فایل‌ها (ZIP)"}
+            {zipping ? t("zip_building") : t("zip_btn")}
           </button>
         </div>
         <p className="mx-auto mt-3 max-w-xl text-[13px] leading-7 text-ink/50 dark:text-white/50">
-          راحت‌ترین راه: ZIP را دانلود کن، از حالت فشرده خارج کن، بعد همه فایل‌ها و
-          پوشه‌ها را یک‌جا با درگ‌ودراپ داخل ریپوی گیت‌هابت آپلود کن.
+          {t("zip_hint")}
         </p>
       </div>
 
@@ -222,25 +226,23 @@ export default function SourceExport({ notify }: { notify: Notify }) {
             <span className="grid h-10 w-10 place-items-center rounded-2xl bg-gold-400 text-pine-950">
               <ListChecks className="h-5 w-5" />
             </span>
-            روش کپی دستی در سایت گیت‌هاب (بدون git)
+            {t("steps_title")}
           </h3>
           <ol className="mt-5 space-y-2.5">
-            {STEPS.map((s, i) => (
+            {STEP_KEYS.map((k, i) => (
               <li
-                key={i}
+                key={k}
                 className="flex items-start gap-3 rounded-2xl bg-white/5 p-3.5 ring-1 ring-white/10"
               >
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-clay-500 text-sm font-black text-white">
-                  {toFa(i + 1)}
+                  {n(i + 1)}
                 </span>
-                <span className="text-sm leading-7 text-white/85">{s}</span>
+                <span className="text-sm leading-7 text-white/85">{t(k, { n: total })}</span>
               </li>
             ))}
           </ol>
           <p className="mt-4 rounded-2xl bg-gold-400/10 p-4 text-[13px] leading-7 font-bold text-gold-100 ring-1 ring-gold-400/25">
-            نکته: فایل‌هایی که با نقطه شروع می‌شوند (.gitignore) یا داخل پوشه‌اند
-            (.github/workflows/...) هم دقیقاً با همین روش و با همان مسیر کامل
-            ساخته می‌شوند — فقط مسیر کامل را در کادر نام فایل بنویس.
+            {t("steps_note")}
           </p>
         </div>
       </motion.div>
@@ -249,9 +251,9 @@ export default function SourceExport({ notify }: { notify: Notify }) {
       <div className="mt-5 rounded-3xl bg-white p-5 ring-1 ring-pine-900/8 dark:bg-white/[0.04] dark:ring-white/10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-black text-pine-950 dark:text-white">
-            {toFa(done.length)} از {toFa(FILES.length)} فایل گذاشته شده
-            <span className="mr-2 text-emerald-600 dark:text-emerald-400">
-              ({toFa(pct)}٪)
+            {t("progress", { done: n(done.length), total })}
+            <span className="mx-2 text-emerald-600 dark:text-emerald-400">
+              {t("pct", { n: n(pct) })}
             </span>
           </p>
           <div className="flex flex-wrap gap-2">
@@ -259,14 +261,14 @@ export default function SourceExport({ notify }: { notify: Notify }) {
               onClick={toggleAll}
               className="rounded-xl bg-pine-950/6 px-4 py-2 text-[13px] font-black text-pine-950 transition hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15"
             >
-              {allOpen ? "بستن همه کدها" : "نمایش همه کدها"}
+              {allOpen ? t("hide_all") : t("show_all")}
             </button>
             <button
               onClick={resetDone}
               className="flex items-center gap-1.5 rounded-xl bg-pine-950/6 px-4 py-2 text-[13px] font-black text-pine-950 transition hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              شروع دوباره
+              {t("reset")}
             </button>
           </div>
         </div>
@@ -278,7 +280,7 @@ export default function SourceExport({ notify }: { notify: Notify }) {
         </div>
         {done.length === FILES.length && (
           <p className="mt-3 rounded-2xl bg-emerald-500/10 p-3 text-center text-sm font-black text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
-            آفرین! همه فایل‌ها گذاشته شد. حالا فقط کافی است از Settings ← Pages گزینه GitHub Actions را فعال کنی.
+            {t("all_done")}
           </p>
         )}
       </div>
@@ -315,7 +317,7 @@ export default function SourceExport({ notify }: { notify: Notify }) {
                   {isDone ? (
                     <Check className="h-4 w-4" strokeWidth={3} />
                   ) : (
-                    toFa(i + 1)
+                    n(i + 1)
                   )}
                 </span>
                 <code
@@ -325,9 +327,21 @@ export default function SourceExport({ notify }: { notify: Notify }) {
                   {f.path}
                 </code>
                 <span className="text-xs font-bold text-ink/40 dark:text-white/40">
-                  {toFa(f.code.split("\n").length)} خط
+                  {t("lines", { n: n(f.code.split("\n").length) })}
                 </span>
-                <div className="mr-auto flex flex-wrap items-center gap-1.5">
+                {f.changed && (
+                  <span
+                    className={cn(
+                      "rounded-full px-2.5 py-1 text-[11px] font-black ring-1",
+                      f.isNew
+                        ? "bg-violet-500/15 text-violet-700 ring-violet-500/30 dark:text-violet-300"
+                        : "bg-amber-400/20 text-amber-700 ring-amber-500/30 dark:text-amber-300"
+                    )}
+                  >
+                    {t(f.isNew ? "new_badge" : "changed_badge", { what: f.changed[lang] })}
+                  </span>
+                )}
+                <div className="ms-auto flex flex-wrap items-center gap-1.5">
                   <button
                     onClick={() => toggleDone(f.path)}
                     className={cn(
@@ -338,7 +352,7 @@ export default function SourceExport({ notify }: { notify: Notify }) {
                     )}
                   >
                     <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                    {isDone ? "گذاشتم" : "گذاشتم؟"}
+                    {isDone ? t("done_yes") : t("done_ask")}
                   </button>
                   <button
                     onClick={() => void copyFile(f)}
@@ -354,12 +368,12 @@ export default function SourceExport({ notify }: { notify: Notify }) {
                     ) : (
                       <Copy className="h-3.5 w-3.5" />
                     )}
-                    {isCopied ? "کپی شد" : "کپی"}
+                    {isCopied ? t("copied") : t("copy")}
                   </button>
                   <button
                     onClick={() => downloadFile(f)}
-                    title="دانلود فایل"
-                    aria-label={`دانلود ${f.path}`}
+                    title={t("download_file")}
+                    aria-label={`${t("download_file")}: ${f.path}`}
                     className="grid h-9 w-9 place-items-center rounded-xl text-ink/55 ring-1 ring-pine-900/15 transition hover:bg-pine-950/5 active:scale-95 dark:text-white/60 dark:ring-white/15 dark:hover:bg-white/8"
                   >
                     <Download className="h-4 w-4" />
@@ -368,7 +382,7 @@ export default function SourceExport({ notify }: { notify: Notify }) {
                     onClick={() => toggleOpen(f.path)}
                     className="flex items-center gap-1 rounded-xl bg-pine-950/6 px-3.5 py-2 text-[13px] font-black text-pine-950 transition hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15"
                   >
-                    {isOpen ? "بستن" : "نمایش کد"}
+                    {isOpen ? t("hide") : t("show_code")}
                     <ChevronDown
                       className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-180")}
                     />
