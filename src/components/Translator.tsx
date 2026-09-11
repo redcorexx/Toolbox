@@ -39,7 +39,6 @@ import {
   speak,
   stopSpeak,
   store,
-  toFa,
   translateText,
   type Engine,
   type EngineUsed,
@@ -47,6 +46,7 @@ import {
   type Notify,
   type Stats,
 } from "../lib/translator";
+import { useI18n } from "../lib/i18n";
 import { cn } from "../utils/cn";
 
 const MAX_LEN = 5000;
@@ -87,6 +87,8 @@ function EngineIcon({ id, className }: { id: Engine; className?: string }) {
 }
 
 export default function Translator({ notify }: { notify: Notify }) {
+  const { t, n, ln, lang } = useI18n();
+
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [alternatives, setAlternatives] = useState<string[]>([]);
@@ -146,7 +148,7 @@ export default function Translator({ notify }: { notify: Notify }) {
   }, [input]);
 
   const doTranslate = useCallback(
-    async (text?: string, s?: string, t?: string) => {
+    async (text?: string, s?: string, tg?: string) => {
       const value = (text ?? input).trim();
       if (!value) {
         setOutput("");
@@ -162,11 +164,11 @@ export default function Translator({ notify }: { notify: Notify }) {
       const guess = source === "auto" ? detectLang(value) : source;
       if (source !== "auto") setDetected("");
 
-      let target = t ?? tgt;
+      let target = tg ?? tgt;
       if (guess === target) {
         target = target === "fa" ? "en" : "fa";
         setTgt(target);
-        notify(`زبان مقصد خودکار به «${langByCode(target).fa}» تغییر کرد`, "info");
+        notify(t("n_target_changed", { lang: ln(target) }), "info");
       }
 
       setLoading(true);
@@ -178,7 +180,7 @@ export default function Translator({ notify }: { notify: Notify }) {
           signal: ctrl.signal,
           onProgress: (done, total) => setProgress({ done, total }),
           onFallback: (failed) =>
-            notify(`${engineName(failed)} پاسخ نداد؛ با MyMemory ترجمه می‌شود`, "info"),
+            notify(t("n_fallback", { engine: engineName(failed, lang) }), "info"),
         });
         setOutput(res.text);
         setAlternatives(res.alternatives);
@@ -214,20 +216,20 @@ export default function Translator({ notify }: { notify: Notify }) {
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
         if (e instanceof TranslateError && e.kind === "quota") {
-          notify("سهمیه روزانه MyMemory تمام شد! ایمیلت را ثبت کن یا موتور را روی «گوگل» بگذار", "error");
+          notify(t("n_quota"), "error");
           setShowEmail(true);
         } else if (e instanceof TranslateError && e.kind === "blocked") {
-          notify("گوگل موقتاً دسترسی را محدود کرده؛ موتور را روی «خودکار» یا MyMemory بگذار", "error");
+          notify(t("n_blocked"), "error");
         } else if (e instanceof TranslateError && e.kind === "network") {
-          notify("اتصال اینترنت را بررسی کن یا موتور ترجمه را عوض کن", "error");
+          notify(t("n_network"), "error");
         } else {
-          notify("خطایی رخ داد؛ دوباره تلاش کن یا موتور ترجمه را عوض کن", "error");
+          notify(t("n_generic"), "error");
         }
       } finally {
         if (abortRef.current === ctrl) setLoading(false);
       }
     },
-    [input, src, tgt, engine, email, notify]
+    [input, src, tgt, engine, email, notify, t, ln, lang]
   );
 
   // auto translate (debounced)
@@ -239,11 +241,12 @@ export default function Translator({ notify }: { notify: Notify }) {
       setDetected("");
       return;
     }
-    const t = setTimeout(() => {
+    const tm = setTimeout(() => {
       void doTranslate();
     }, 900);
-    return () => clearTimeout(t);
-  }, [input, src, tgt, auto, engine, doTranslate]);
+    return () => clearTimeout(tm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input, src, tgt, auto, engine]);
 
   const swap = () => {
     stopSpeak();
@@ -278,13 +281,14 @@ export default function Translator({ notify }: { notify: Notify }) {
       return;
     }
     if (!canListen()) {
-      notify("مرورگر شما از ورودی صوتی پشتیبانی نمی‌کند (پیشنهاد: کروم)", "error");
+      notify(t("n_no_stt"), "error");
       return;
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const rec = new SR();
     recRef.current = rec;
-    rec.lang = src === "auto" ? "fa-IR" : langByCode(src).speech;
+    rec.lang =
+      src === "auto" ? (lang === "fa" ? "fa-IR" : "en-US") : langByCode(src).speech;
     rec.interimResults = true;
     rec.continuous = false;
     rec.onresult = (e: any) => {
@@ -301,7 +305,7 @@ export default function Translator({ notify }: { notify: Notify }) {
     try {
       rec.start();
       setListening(true);
-      notify("در حال گوش دادن... صحبت کن", "info");
+      notify(t("n_listening"), "info");
     } catch {
       setListening(false);
     }
@@ -338,33 +342,33 @@ export default function Translator({ notify }: { notify: Notify }) {
       ta.remove();
     }
     setCopied(true);
-    notify("متن کپی شد", "success");
+    notify(t("n_copied"), "success");
     setTimeout(() => setCopied(false), 1500);
   };
 
   const paste = async () => {
     try {
-      const t = await navigator.clipboard.readText();
-      if (t) {
-        setInput((prev) => `${prev} ${t}`.trim().slice(0, MAX_LEN));
+      const txt = await navigator.clipboard.readText();
+      if (txt) {
+        setInput((prev) => `${prev} ${txt}`.trim().slice(0, MAX_LEN));
         inputRef.current?.focus();
       } else {
-        notify("کلیپ‌بورد خالی است", "info");
+        notify(t("n_clip_empty"), "info");
       }
     } catch {
-      notify("مرورگر اجازه دسترسی به کلیپ‌بورد نداد", "error");
+      notify(t("n_clip_denied"), "error");
     }
   };
 
   const saveEmail = () => {
     const v = emailDraft.trim();
     if (v && !/^\S+@\S+\.\S+$/.test(v)) {
-      notify("ایمیل معتبر وارد کن", "error");
+      notify(t("n_email_invalid"), "error");
       return;
     }
     setEmail(v);
     store.set("salam-tr-email", v);
-    notify(v ? "ایمیل ذخیره شد؛ سهمیه‌ات بیشتر شد" : "ایمیل حذف شد", "success");
+    notify(v ? t("n_email_saved") : t("n_email_removed"), "success");
   };
 
   const restore = (item: HistoryItem) => {
@@ -394,7 +398,7 @@ export default function Translator({ notify }: { notify: Notify }) {
   const clearHistory = () => {
     setHistory([]);
     saveHistory([]);
-    notify("تاریخچه پاک شد", "success");
+    notify(t("n_history_cleared"), "success");
   };
 
   const words = useMemo(
@@ -403,10 +407,10 @@ export default function Translator({ notify }: { notify: Notify }) {
   );
 
   const statCards = [
-    { icon: CalendarCheck, value: toFa(stats.dayCount), label: "ترجمه امروز" },
-    { icon: Languages, value: toFa(stats.translations), label: "کل ترجمه‌ها" },
-    { icon: Type, value: toFa(stats.chars.toLocaleString("en-US")), label: "حروف ترجمه‌شده" },
-    { icon: Globe, value: toFa(LANGUAGES.length), label: "زبان پشتیبانی‌شده" },
+    { icon: CalendarCheck, value: n(stats.dayCount), label: t("stat_today") },
+    { icon: Languages, value: n(stats.translations), label: t("stat_total") },
+    { icon: Type, value: n(stats.chars.toLocaleString("en-US")), label: t("stat_chars") },
+    { icon: Globe, value: n(LANGUAGES.length), label: t("stat_langs") },
   ];
 
   const iconBtn =
@@ -418,9 +422,9 @@ export default function Translator({ notify }: { notify: Notify }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-1.5 text-[13px] font-black text-ink/50 dark:text-white/50">
           <Sparkles className="h-4 w-4 text-gold-500" />
-          امتحان کن:
+          {t("try_it")}
         </span>
-        {QUICK_PHRASES.slice(0, 5).map((p) => (
+        {QUICK_PHRASES[lang].slice(0, 5).map((p) => (
           <button
             key={p}
             onClick={() => setInput(p)}
@@ -439,8 +443,8 @@ export default function Translator({ notify }: { notify: Notify }) {
           <motion.button
             whileTap={{ rotate: 180, scale: 0.9 }}
             onClick={swap}
-            title="جابه‌جایی زبان‌ها"
-            aria-label="جابه‌جایی زبان‌ها"
+            title={t("swap_langs")}
+            aria-label={t("swap_langs")}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-clay-500 text-white shadow-lg shadow-clay-500/25 transition hover:bg-clay-600 sm:h-12 sm:w-12"
           >
             <ArrowRightLeft className="h-5 w-5" />
@@ -452,7 +456,7 @@ export default function Translator({ notify }: { notify: Notify }) {
         <div className="border-b border-pine-900/8 px-3 py-3 sm:px-4 dark:border-white/10">
           <div className="flex items-center gap-1.5 text-[13px] font-black text-ink/50 dark:text-white/50">
             <Cpu className="h-4 w-4 text-emerald-500" />
-            موتور ترجمه
+            {t("engine_title")}
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {ENGINES.map((e) => {
@@ -462,7 +466,7 @@ export default function Translator({ notify }: { notify: Notify }) {
                   key={e.id}
                   type="button"
                   onClick={() => setEngine(e.id)}
-                  title={e.desc}
+                  title={e.desc[lang]}
                   aria-pressed={active}
                   className={cn(
                     "flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-start transition active:scale-[0.98]",
@@ -481,14 +485,14 @@ export default function Translator({ notify }: { notify: Notify }) {
                         active ? "text-pine-950 dark:text-white" : "text-ink/75 dark:text-white/75"
                       )}
                     >
-                      {e.label}
+                      {e.label[lang]}
                     </span>
                     <span className="hidden truncate text-[11px] font-medium text-ink/45 sm:block dark:text-white/45">
-                      {e.desc}
+                      {e.desc[lang]}
                     </span>
                   </span>
                   {active && (
-                    <Check className="mr-auto h-4 w-4 shrink-0 text-emerald-500" strokeWidth={3} />
+                    <Check className="ms-auto h-4 w-4 shrink-0 text-emerald-500" strokeWidth={3} />
                   )}
                 </button>
               );
@@ -502,7 +506,7 @@ export default function Translator({ notify }: { notify: Notify }) {
           <div className="flex flex-col border-b border-pine-900/8 p-4 sm:p-5 lg:border-b-0 dark:border-white/10">
             <div className="flex min-h-8 items-center justify-between gap-2">
               <span className="text-[13px] font-black text-ink/45 dark:text-white/45">
-                متن مبدأ
+                {t("source_label")}
               </span>
               <AnimatePresence>
                 {src === "auto" && detected && (
@@ -512,7 +516,7 @@ export default function Translator({ notify }: { notify: Notify }) {
                     exit={{ opacity: 0, scale: 0.9 }}
                     className="rounded-full bg-clay-500/10 px-3 py-1 text-xs font-black text-clay-600 dark:text-clay-400"
                   >
-                    تشخیص: {langByCode(detected).fa}
+                    {t("detected", { lang: ln(detected) })}
                   </motion.span>
                 )}
               </AnimatePresence>
@@ -529,7 +533,7 @@ export default function Translator({ notify }: { notify: Notify }) {
               }}
               dir="auto"
               rows={5}
-              placeholder="متنت را اینجا بنویس، بچسبان یا با میکروفون بخوان..."
+              placeholder={t("input_placeholder")}
               className="mt-2 max-h-[340px] min-h-[170px] w-full resize-none bg-transparent text-[17px] leading-9 font-medium text-ink outline-none placeholder:text-ink/30 dark:text-white dark:placeholder:text-white/30"
             />
             <div className="mt-3 flex items-center justify-between gap-2">
@@ -543,15 +547,17 @@ export default function Translator({ notify }: { notify: Notify }) {
                       : "text-ink/40 dark:text-white/40"
                 )}
               >
-                {toFa(input.length.toLocaleString("en-US"))} / {toFa(MAX_LEN.toLocaleString("en-US"))} حرف
-                {" • "}
-                {toFa(words)} کلمه
+                {t("counter", {
+                  chars: n(input.length.toLocaleString("en-US")),
+                  max: n(MAX_LEN.toLocaleString("en-US")),
+                  words: n(words),
+                })}
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={toggleListen}
-                  title="ورودی صوتی"
-                  aria-label="ورودی صوتی"
+                  title={t("btn_mic")}
+                  aria-label={t("btn_mic")}
                   className={cn(
                     iconBtn,
                     listening
@@ -563,8 +569,8 @@ export default function Translator({ notify }: { notify: Notify }) {
                 </button>
                 <button
                   onClick={paste}
-                  title="چسباندن از کلیپ‌بورد"
-                  aria-label="چسباندن"
+                  title={t("btn_paste")}
+                  aria-label={t("btn_paste")}
                   className={cn(iconBtn, "bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15")}
                 >
                   <ClipboardPaste className="h-[18px] w-[18px]" />
@@ -572,8 +578,8 @@ export default function Translator({ notify }: { notify: Notify }) {
                 <button
                   onClick={() => toggleSpeak("src")}
                   disabled={!input.trim()}
-                  title="خواندن متن مبدأ"
-                  aria-label="خواندن متن مبدأ"
+                  title={t("btn_speak_src")}
+                  aria-label={t("btn_speak_src")}
                   className={cn(iconBtn, "bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15")}
                 >
                   {speaking === "src" ? (
@@ -590,8 +596,8 @@ export default function Translator({ notify }: { notify: Notify }) {
                     inputRef.current?.focus();
                   }}
                   disabled={!input}
-                  title="پاک کردن"
-                  aria-label="پاک کردن"
+                  title={t("btn_clear")}
+                  aria-label={t("btn_clear")}
                   className={cn(iconBtn, "bg-pine-950/5 text-pine-800 hover:bg-red-500 hover:text-white dark:bg-white/8 dark:text-white dark:hover:bg-red-500")}
                 >
                   <Eraser className="h-[18px] w-[18px]" />
@@ -601,14 +607,14 @@ export default function Translator({ notify }: { notify: Notify }) {
           </div>
 
           {/* target */}
-          <div className="flex flex-col border-pine-900/8 p-4 sm:p-5 lg:border-r dark:border-white/10">
+          <div className="flex flex-col border-pine-900/8 p-4 sm:p-5 lg:border-s dark:border-white/10">
             <div className="flex min-h-8 items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-2 text-[13px] font-black text-ink/45 dark:text-white/45">
-                <span className="truncate">ترجمه ({langByCode(tgt).fa})</span>
+                <span className="truncate">{t("target_label", { lang: ln(tgt) })}</span>
                 {usedEngine && output && !loading && (
                   <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-black text-emerald-600 ring-1 ring-emerald-500/20 dark:text-emerald-400">
                     <EngineIcon id={usedEngine} className="h-3 w-3" />
-                    با {engineName(usedEngine)}
+                    {t("via_engine", { engine: engineName(usedEngine, lang) })}
                   </span>
                 )}
               </span>
@@ -616,8 +622,8 @@ export default function Translator({ notify }: { notify: Notify }) {
                 <button
                   onClick={() => toggleSpeak("tgt")}
                   disabled={!output.trim()}
-                  title="خواندن ترجمه"
-                  aria-label="خواندن ترجمه"
+                  title={t("btn_speak_tgt")}
+                  aria-label={t("btn_speak_tgt")}
                   className={cn(iconBtn, "h-9 w-9 bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15")}
                 >
                   {speaking === "tgt" ? (
@@ -629,8 +635,8 @@ export default function Translator({ notify }: { notify: Notify }) {
                 <button
                   onClick={() => void copyText(output)}
                   disabled={!output.trim()}
-                  title="کپی ترجمه"
-                  aria-label="کپی ترجمه"
+                  title={t("btn_copy_tr")}
+                  aria-label={t("btn_copy_tr")}
                   className={cn(iconBtn, "h-9 w-9 bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15")}
                 >
                   {copied ? (
@@ -653,7 +659,7 @@ export default function Translator({ notify }: { notify: Notify }) {
                 <p className="whitespace-pre-wrap text-ink dark:text-white">{output}</p>
               ) : (
                 <p className="pt-1 text-ink/30 dark:text-white/30">
-                  ترجمه اینجا نمایش داده می‌شود...
+                  {t("output_placeholder")}
                 </p>
               )}
             </div>
@@ -667,7 +673,7 @@ export default function Translator({ notify }: { notify: Notify }) {
                   />
                 </div>
                 <p className="mt-1.5 text-xs font-bold text-ink/45 dark:text-white/45">
-                  متن طولانی است؛ در حال ترجمه بخش {toFa(progress.done)} از {toFa(progress.total)}...
+                  {t("long_progress", { done: n(progress.done), total: n(progress.total) })}
                 </p>
               </div>
             )}
@@ -682,7 +688,7 @@ export default function Translator({ notify }: { notify: Notify }) {
                 >
                   <div className="mt-3 rounded-2xl bg-cream p-3 dark:bg-white/5">
                     <p className="px-1 text-xs font-black text-ink/45 dark:text-white/45">
-                      ترجمه‌های جایگزین (برای کپی بزن روشون):
+                      {t("alternatives_title")}
                     </p>
                     <div className="mt-2 space-y-1.5">
                       {alternatives.map((a, i) => (
@@ -714,7 +720,7 @@ export default function Translator({ notify }: { notify: Notify }) {
             <span className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors", auto ? "bg-emerald-500" : "bg-ink/15 dark:bg-white/15")}>
               <span className={cn("absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all", auto ? "right-1" : "right-6")} />
             </span>
-            ترجمه خودکار
+            {t("auto_translate")}
           </button>
           {engine !== "google" && (
             <button
@@ -722,16 +728,16 @@ export default function Translator({ notify }: { notify: Notify }) {
               className="flex items-center gap-1.5 text-sm font-black text-ink/70 transition hover:text-clay-600 dark:text-white/70 dark:hover:text-gold-400"
             >
               <Mail className="h-4 w-4" />
-              افزایش سهمیه MyMemory
+              {t("quota_btn")}
               {email && <Check className="h-4 w-4 text-emerald-500" />}
               <ChevronDown className={cn("h-4 w-4 transition-transform", showEmail && "rotate-180")} />
             </button>
           )}
 
-          <div className="flex items-center gap-3 sm:mr-auto">
+          <div className="flex items-center gap-3 sm:ms-auto">
             {loading && progress.total > 1 && (
               <span className="hidden text-xs font-bold text-ink/45 sm:inline dark:text-white/45">
-                {toFa(progress.done)}/{toFa(progress.total)}
+                {n(progress.done)}/{n(progress.total)}
               </span>
             )}
             <button
@@ -742,12 +748,12 @@ export default function Translator({ notify }: { notify: Notify }) {
               {loading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  در حال ترجمه...
+                  {t("translating")}
                 </>
               ) : (
                 <>
                   <Languages className="h-5 w-5" />
-                  ترجمه کن
+                  {t("translate_btn")}
                   <span className="kbd hidden sm:inline">Ctrl + Enter</span>
                 </>
               )}
@@ -767,8 +773,7 @@ export default function Translator({ notify }: { notify: Notify }) {
             >
               <div className="flex flex-col gap-3 border-t border-dashed border-pine-900/12 p-4 sm:flex-row sm:items-center dark:border-white/10">
                 <p className="flex-1 text-[13px] leading-7 font-medium text-ink/60 dark:text-white/60">
-                  سهمیه رایگان روزانه محدود است. با ثبت ایمیل (فقط در مرورگر تو ذخیره می‌شود)،
-                  سهمیه‌ات چند برابر می‌شود:
+                  {t("email_hint")}
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -783,7 +788,7 @@ export default function Translator({ notify }: { notify: Notify }) {
                     onClick={saveEmail}
                     className="shrink-0 rounded-xl bg-pine-950 px-5 py-2.5 text-sm font-black text-white transition hover:bg-clay-600 dark:bg-gold-400 dark:text-pine-950 dark:hover:bg-gold-500"
                   >
-                    ذخیره
+                    {t("save")}
                   </button>
                 </div>
               </div>
