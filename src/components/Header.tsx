@@ -1,5 +1,7 @@
-import { GitBranch, Languages, Moon, Sun } from "lucide-react";
+import { Globe, Languages, Moon, Sun } from "lucide-react";
 import { GithubIcon } from "./icons";
+import { useI18n } from "../lib/i18n";
+import { cn } from "../utils/cn";
 
 interface Props {
   theme: "dark" | "light";
@@ -7,6 +9,15 @@ interface Props {
 }
 
 export default function Header({ theme, onToggleTheme }: Props) {
+  const { t, toggle } = useI18n();
+
+  const links = [
+    { href: "#translator", label: t("nav_translator") },
+    { href: "#history", label: t("nav_history") },
+    { href: "#deploy", label: t("nav_deploy") },
+    { href: "#source", label: t("nav_source"), accent: true },
+  ];
+
   return (
     <header className="sticky top-0 z-40 border-b border-pine-900/8 bg-cream/85 backdrop-blur-xl dark:border-white/8 dark:bg-pine-950/85">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
@@ -16,27 +27,24 @@ export default function Header({ theme, onToggleTheme }: Props) {
           </span>
           <span className="leading-tight">
             <span className="block text-lg font-black text-pine-950 dark:text-white">
-              مترجم متن
+              {t("brand")}
             </span>
             <span className="block text-[11px] font-medium text-ink/50 dark:text-white/50">
-              رایگان • بدون ثبت‌نام • متن‌باز
+              {t("tagline")}
             </span>
           </span>
         </a>
 
         <nav className="hidden items-center gap-1 text-sm font-bold text-ink/60 md:flex dark:text-white/60">
-          <a href="#translator" className="rounded-xl px-4 py-2 transition hover:bg-pine-950/5 hover:text-pine-950 dark:hover:bg-white/8 dark:hover:text-white">
-            مترجم
-          </a>
-          <a href="#history" className="rounded-xl px-4 py-2 transition hover:bg-pine-950/5 hover:text-pine-950 dark:hover:bg-white/8 dark:hover:text-white">
-            تاریخچه
-          </a>
-          <a href="#deploy" className="rounded-xl px-4 py-2 transition hover:bg-pine-950/5 hover:text-pine-950 dark:hover:bg-white/8 dark:hover:text-white">
-            انتشار در گیت‌هاب
-          </a>
-          <a href="#source" className="rounded-xl px-4 py-2 transition hover:bg-pine-950/5 hover:text-pine-950 dark:hover:bg-white/8 dark:hover:text-white">
-            فایل‌های سورس
-          </a>
+          {links.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              className="rounded-xl px-4 py-2 transition hover:bg-pine-950/5 hover:text-pine-950 dark:hover:bg-white/8 dark:hover:text-white"
+            >
+              {l.label}
+            </a>
+          ))}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -45,37 +53,47 @@ export default function Header({ theme, onToggleTheme }: Props) {
             className="hidden items-center gap-2 rounded-xl bg-pine-950 px-4 py-2.5 text-[13px] font-black text-white shadow-md transition hover:-translate-y-0.5 hover:bg-clay-600 sm:inline-flex dark:bg-gold-400 dark:text-pine-950 dark:hover:bg-gold-500"
           >
             <GithubIcon className="h-4 w-4" />
-            سورس در گیت‌هاب
+            {t("github_btn")}
           </a>
-          <a
-            href="#deploy"
-            aria-label="انتشار در گیت‌هاب"
-            className="grid h-10 w-10 place-items-center rounded-xl bg-pine-950 text-white shadow-md transition hover:bg-clay-600 sm:hidden dark:bg-gold-400 dark:text-pine-950"
+
+          {/* دکمه تغییر زبان رابط کاربری (فارسی / English) */}
+          <button
+            onClick={toggle}
+            title={t("lang_switch")}
+            aria-label={t("lang_switch")}
+            className="flex h-10 items-center gap-1.5 rounded-xl bg-gold-400 px-3 text-[13px] font-black text-pine-950 shadow-md transition hover:-translate-y-0.5 hover:bg-gold-500 dark:bg-gold-400 dark:hover:bg-gold-500"
           >
-            <GitBranch className="h-4 w-4" />
-          </a>
+            <Globe className="h-4 w-4" />
+            {t("lang_switch_label")}
+          </button>
+
           <button
             onClick={onToggleTheme}
-            aria-label={theme === "dark" ? "حالت روشن" : "حالت تیره"}
+            aria-label={theme === "dark" ? t("theme_light") : t("theme_dark")}
+            title={theme === "dark" ? t("theme_light") : t("theme_dark")}
             className="grid h-10 w-10 place-items-center rounded-xl bg-pine-950/6 text-pine-950 ring-1 ring-pine-900/10 transition hover:bg-pine-950/10 dark:bg-white/8 dark:text-gold-400 dark:ring-white/10 dark:hover:bg-white/15"
           >
             {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
         </div>
       </div>
+
+      {/* منوی موبایل */}
       <nav className="flex items-center gap-1 overflow-x-auto px-4 pb-3 text-[13px] font-black text-ink/60 md:hidden dark:text-white/60">
-        <a href="#translator" className="whitespace-nowrap rounded-lg bg-pine-950/5 px-3.5 py-2 dark:bg-white/8">
-          مترجم
-        </a>
-        <a href="#history" className="whitespace-nowrap rounded-lg bg-pine-950/5 px-3.5 py-2 dark:bg-white/8">
-          تاریخچه
-        </a>
-        <a href="#deploy" className="whitespace-nowrap rounded-lg bg-pine-950/5 px-3.5 py-2 dark:bg-white/8">
-          انتشار در گیت‌هاب
-        </a>
-        <a href="#source" className="whitespace-nowrap rounded-lg bg-clay-500/12 px-3.5 py-2 text-clay-600 dark:text-gold-400">
-          فایل‌های سورس
-        </a>
+        {links.map((l) => (
+          <a
+            key={l.href}
+            href={l.href}
+            className={cn(
+              "whitespace-nowrap rounded-lg px-3.5 py-2",
+              l.accent
+                ? "bg-clay-500/12 text-clay-600 dark:text-gold-400"
+                : "bg-pine-950/5 dark:bg-white/8"
+            )}
+          >
+            {l.label}
+          </a>
+        ))}
       </nav>
     </header>
   );
