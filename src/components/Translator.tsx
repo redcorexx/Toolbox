@@ -1,0 +1,716 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowRightLeft,
+  CalendarCheck,
+  Check,
+  ChevronDown,
+  ClipboardPaste,
+  Copy,
+  Eraser,
+  Globe,
+  Languages,
+  Loader2,
+  Mail,
+  Mic,
+  Sparkles,
+  Type,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import LanguageSelect from "./LanguageSelect";
+import HistoryPanel from "./HistoryPanel";
+import {
+  LANGUAGES,
+  QUICK_PHRASES,
+  TranslateError,
+  canListen,
+  detectLang,
+  langByCode,
+  loadHistory,
+  loadStats,
+  recordTranslation,
+  saveHistory,
+  speak,
+  stopSpeak,
+  store,
+  toFa,
+  translateText,
+  type HistoryItem,
+  type Notify,
+  type Stats,
+} from "../lib/translator";
+import { cn } from "../utils/cn";
+
+const MAX_LEN = 5000;
+
+const validCode = (c: string, allowAuto: boolean) =>
+  (allowAuto && c === "auto") || LANGUAGES.some((l) => l.code === c);
+
+export default function Translator({ notify }: { notify: Notify }) {
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
+  const [alternatives, setAlternatives] = useState<string[]>([]);
+  const [src, setSrc] = useState(() => {
+    const v = store.get("salam-tr-src", "auto");
+    return validCode(v, true) ? v : "auto";
+  });
+  const [tgt, setTgt] = useState(() => {
+    const v = store.get("salam-tr-tgt", "en");
+    return validCode(v, false) ? v : "en";
+  });
+  const [detected, setDetected] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 1 });
+  const [auto, setAuto] = useState(() => store.get("salam-tr-auto", "1") === "1");
+  const [email, setEmail] = useState(() => store.get("salam-tr-email", ""));
+  const [emailDraft, setEmailDraft] = useState(() => store.get("salam-tr-email", ""));
+  const [showEmail, setShowEmail] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>(loadHistory);
+  const [stats, setStats] = useState<Stats>(loadStats);
+  const [speaking, setSpeaking] = useState<"src" | "tgt" | null>(null);
+  const [listening, setListening] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const abortRef = useRef<AbortController | null>(null);
+  const recRef = useRef<any>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => store.set("salam-tr-src", src), [src]);
+  useEffect(() => store.set("salam-tr-tgt", tgt), [tgt]);
+  useEffect(() => store.set("salam-tr-auto", auto ? "1" : "0"), [auto]);
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      stopSpeak();
+      try {
+        recRef.current?.stop?.();
+      } catch {
+        /* noop */
+      }
+    },
+    []
+  );
+
+  // auto-grow textarea
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(Math.max(el.scrollHeight, 170), 340) + "px";
+  }, [input]);
+
+  const doTranslate = useCallback(
+    async (text?: string, s?: string, t?: string) => {
+      const value = (text ?? input).trim();
+      if (!value) {
+        setOutput("");
+        setAlternatives([]);
+        setDetected("");
+        return;
+      }
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+
+      let source = s ?? src;
+      if (source === "auto") {
+        source = detectLang(value);
+        setDetected(source);
+      } else {
+        setDetected("");
+      }
+      let target = t ?? tgt;
+      if (source === target) {
+        target = target === "fa" ? "en" : "fa";
+        setTgt(target);
+        notify(`زبان مقصد خودکار به «${langByCode(target).fa}» تغییر کرد`, "info");
+      }
+
+      setLoading(true);
+      setProgress({ done: 0, total: 1 });
+      try {
+        const res = await translateText(value, source, target, {
+          email: email || undefined,
+          signal: ctrl.signal,
+          onProgress: (done, total) => setProgress({ done, total }),
+        });
+        setOutput(res.text);
+        setAlternatives(res.alternatives);
+        setStats(recordTranslation(value.length));
+        setHistory((prev) => {
+          if (
+            prev[0]?.sourceText === value.slice(0, 500) &&
+            prev[0]?.src === source &&
+            prev[0]?.tgt === target
+          )
+            return prev;
+          const item: HistoryItem = {
+            id:
+              typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? crypto.randomUUID()
+                : String(Date.now()),
+            src: source,
+            tgt: target,
+            sourceText: value.slice(0, 500),
+            translatedText: res.text.slice(0, 500),
+            time: Date.now(),
+            fav: false,
+          };
+          const next = [item, ...prev].slice(0, 100);
+          saveHistory(next);
+          return next;
+        });
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        if (e instanceof TranslateError && e.kind === "quota") {
+          notify("سهمیه روزانه ترجمه تمام شد! ایمیلت را ثبت کن تا چند برابر شود", "error");
+          setShowEmail(true);
+        } else if (e instanceof TranslateError && e.kind === "network") {
+          notify("اتصال اینترنت را بررسی کن و دوباره تلاش کن", "error");
+        } else {
+          notify("خطایی رخ داد؛ دوباره تلاش کن", "error");
+        }
+      } finally {
+        if (abortRef.current === ctrl) setLoading(false);
+      }
+    },
+    [input, src, tgt, email, notify]
+  );
+
+  // auto translate (debounced)
+  useEffect(() => {
+    if (!auto) return;
+    if (!input.trim()) {
+      setOutput("");
+      setAlternatives([]);
+      setDetected("");
+      return;
+    }
+    const t = setTimeout(() => {
+      void doTranslate();
+    }, 900);
+    return () => clearTimeout(t);
+  }, [input, src, tgt, auto, doTranslate]);
+
+  const swap = () => {
+    stopSpeak();
+    setSpeaking(null);
+    if (src === "auto") {
+      const newTgt =
+        detected && detected !== tgt ? detected : tgt === "fa" ? "en" : "fa";
+      setSrc(tgt);
+      setTgt(newTgt);
+    } else {
+      setSrc(tgt);
+      setTgt(src);
+    }
+    if (output) {
+      setInput(output);
+      setOutput("");
+      setAlternatives([]);
+    }
+  };
+
+  const toggleListen = () => {
+    if (listening) {
+      try {
+        recRef.current?.stop?.();
+      } catch {
+        /* noop */
+      }
+      return;
+    }
+    if (!canListen()) {
+      notify("مرورگر شما از ورودی صوتی پشتیبانی نمی‌کند (پیشنهاد: کروم)", "error");
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    recRef.current = rec;
+    rec.lang = src === "auto" ? "fa-IR" : langByCode(src).speech;
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onresult = (e: any) => {
+      let final = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      }
+      if (final.trim()) {
+        setInput((prev) => (prev ? `${prev} ${final.trim()}` : final.trim()).slice(0, MAX_LEN));
+      }
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    try {
+      rec.start();
+      setListening(true);
+      notify("در حال گوش دادن... صحبت کن", "info");
+    } catch {
+      setListening(false);
+    }
+  };
+
+  const toggleSpeak = (which: "src" | "tgt") => {
+    if (speaking === which) {
+      stopSpeak();
+      setSpeaking(null);
+      return;
+    }
+    const text = which === "src" ? input : output;
+    if (!text.trim()) return;
+    const code =
+      which === "src"
+        ? src === "auto"
+          ? detected || detectLang(text)
+          : src
+        : tgt;
+    setSpeaking(which);
+    speak(text, langByCode(code).speech, () => setSpeaking(null));
+  };
+
+  const copyText = async (text: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopied(true);
+    notify("متن کپی شد", "success");
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const paste = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) {
+        setInput((prev) => `${prev} ${t}`.trim().slice(0, MAX_LEN));
+        inputRef.current?.focus();
+      } else {
+        notify("کلیپ‌بورد خالی است", "info");
+      }
+    } catch {
+      notify("مرورگر اجازه دسترسی به کلیپ‌بورد نداد", "error");
+    }
+  };
+
+  const saveEmail = () => {
+    const v = emailDraft.trim();
+    if (v && !/^\S+@\S+\.\S+$/.test(v)) {
+      notify("ایمیل معتبر وارد کن", "error");
+      return;
+    }
+    setEmail(v);
+    store.set("salam-tr-email", v);
+    notify(v ? "ایمیل ذخیره شد؛ سهمیه‌ات بیشتر شد" : "ایمیل حذف شد", "success");
+  };
+
+  const restore = (item: HistoryItem) => {
+    stopSpeak();
+    setSpeaking(null);
+    setSrc(item.src);
+    setTgt(item.tgt);
+    setInput(item.sourceText);
+    void doTranslate(item.sourceText, item.src, item.tgt);
+    document.getElementById("translator")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const toggleFav = (id: string) =>
+    setHistory((prev) => {
+      const next = prev.map((h) => (h.id === id ? { ...h, fav: !h.fav } : h));
+      saveHistory(next);
+      return next;
+    });
+
+  const deleteItem = (id: string) =>
+    setHistory((prev) => {
+      const next = prev.filter((h) => h.id !== id);
+      saveHistory(next);
+      return next;
+    });
+
+  const clearHistory = () => {
+    setHistory([]);
+    saveHistory([]);
+    notify("تاریخچه پاک شد", "success");
+  };
+
+  const words = useMemo(
+    () => (input.trim() ? input.trim().split(/\s+/).length : 0),
+    [input]
+  );
+
+  const statCards = [
+    { icon: CalendarCheck, value: toFa(stats.dayCount), label: "ترجمه امروز" },
+    { icon: Languages, value: toFa(stats.translations), label: "کل ترجمه‌ها" },
+    { icon: Type, value: toFa(stats.chars.toLocaleString("en-US")), label: "حروف ترجمه‌شده" },
+    { icon: Globe, value: toFa(LANGUAGES.length), label: "زبان پشتیبانی‌شده" },
+  ];
+
+  const iconBtn =
+    "grid h-10 w-10 place-items-center rounded-xl transition active:scale-95 disabled:opacity-40";
+
+  return (
+    <section id="translator" className="mx-auto max-w-6xl scroll-mt-24 px-4 pt-8 sm:px-6">
+      {/* quick phrases */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1.5 text-[13px] font-black text-ink/50 dark:text-white/50">
+          <Sparkles className="h-4 w-4 text-gold-500" />
+          امتحان کن:
+        </span>
+        {QUICK_PHRASES.slice(0, 5).map((p) => (
+          <button
+            key={p}
+            onClick={() => setInput(p)}
+            className="rounded-full bg-white px-4 py-1.5 text-[13px] font-bold text-pine-800 shadow-sm ring-1 ring-pine-900/10 transition hover:-translate-y-0.5 hover:bg-pine-950 hover:text-white dark:bg-white/6 dark:text-white/80 dark:ring-white/10 dark:hover:bg-gold-400 dark:hover:text-pine-950"
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+
+      {/* main card */}
+      <div className="mt-4 rounded-[1.75rem] bg-white shadow-[0_25px_70px_-25px_rgba(11,36,34,0.45)] ring-1 ring-pine-900/10 dark:bg-white/[0.04] dark:ring-white/10 dark:shadow-[0_25px_70px_-25px_rgba(0,0,0,0.8)]">
+        {/* language bar */}
+        <div className="flex items-center gap-2 border-b border-pine-900/8 p-3 sm:gap-3 sm:p-4 dark:border-white/10">
+          <LanguageSelect value={src} onChange={setSrc} allowAuto />
+          <motion.button
+            whileTap={{ rotate: 180, scale: 0.9 }}
+            onClick={swap}
+            title="جابه‌جایی زبان‌ها"
+            aria-label="جابه‌جایی زبان‌ها"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-clay-500 text-white shadow-lg shadow-clay-500/25 transition hover:bg-clay-600 sm:h-12 sm:w-12"
+          >
+            <ArrowRightLeft className="h-5 w-5" />
+          </motion.button>
+          <LanguageSelect value={tgt} onChange={setTgt} />
+        </div>
+
+        {/* panes */}
+        <div className="grid lg:grid-cols-2">
+          {/* source */}
+          <div className="flex flex-col border-b border-pine-900/8 p-4 sm:p-5 lg:border-b-0 dark:border-white/10">
+            <div className="flex min-h-8 items-center justify-between gap-2">
+              <span className="text-[13px] font-black text-ink/45 dark:text-white/45">
+                متن مبدأ
+              </span>
+              <AnimatePresence>
+                {src === "auto" && detected && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="rounded-full bg-clay-500/10 px-3 py-1 text-xs font-black text-clay-600 dark:text-clay-400"
+                  >
+                    تشخیص: {langByCode(detected).fa}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value.slice(0, MAX_LEN))}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  void doTranslate();
+                }
+              }}
+              dir="auto"
+              rows={5}
+              placeholder="متنت را اینجا بنویس، بچسبان یا با میکروفون بخوان..."
+              className="mt-2 max-h-[340px] min-h-[170px] w-full resize-none bg-transparent text-[17px] leading-9 font-medium text-ink outline-none placeholder:text-ink/30 dark:text-white dark:placeholder:text-white/30"
+            />
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <span
+                className={cn(
+                  "text-xs font-bold",
+                  input.length > 4900
+                    ? "text-red-500"
+                    : input.length > 4500
+                      ? "text-amber-500"
+                      : "text-ink/40 dark:text-white/40"
+                )}
+              >
+                {toFa(input.length.toLocaleString("en-US"))} / {toFa(MAX_LEN.toLocaleString("en-US"))} حرف
+                {" • "}
+                {toFa(words)} کلمه
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={toggleListen}
+                  title="ورودی صوتی"
+                  aria-label="ورودی صوتی"
+                  className={cn(
+                    iconBtn,
+                    listening
+                      ? "animate-pulse bg-red-500 text-white shadow-lg shadow-red-500/30"
+                      : "bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15"
+                  )}
+                >
+                  <Mic className="h-[18px] w-[18px]" />
+                </button>
+                <button
+                  onClick={paste}
+                  title="چسباندن از کلیپ‌بورد"
+                  aria-label="چسباندن"
+                  className={cn(iconBtn, "bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15")}
+                >
+                  <ClipboardPaste className="h-[18px] w-[18px]" />
+                </button>
+                <button
+                  onClick={() => toggleSpeak("src")}
+                  disabled={!input.trim()}
+                  title="خواندن متن مبدأ"
+                  aria-label="خواندن متن مبدأ"
+                  className={cn(iconBtn, "bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15")}
+                >
+                  {speaking === "src" ? (
+                    <VolumeX className="h-[18px] w-[18px] text-clay-500" />
+                  ) : (
+                    <Volume2 className="h-[18px] w-[18px]" />
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setInput("");
+                    setOutput("");
+                    setAlternatives([]);
+                    inputRef.current?.focus();
+                  }}
+                  disabled={!input}
+                  title="پاک کردن"
+                  aria-label="پاک کردن"
+                  className={cn(iconBtn, "bg-pine-950/5 text-pine-800 hover:bg-red-500 hover:text-white dark:bg-white/8 dark:text-white dark:hover:bg-red-500")}
+                >
+                  <Eraser className="h-[18px] w-[18px]" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* target */}
+          <div className="flex flex-col border-pine-900/8 p-4 sm:p-5 lg:border-r dark:border-white/10">
+            <div className="flex min-h-8 items-center justify-between gap-2">
+              <span className="text-[13px] font-black text-ink/45 dark:text-white/45">
+                ترجمه ({langByCode(tgt).fa})
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => toggleSpeak("tgt")}
+                  disabled={!output.trim()}
+                  title="خواندن ترجمه"
+                  aria-label="خواندن ترجمه"
+                  className={cn(iconBtn, "h-9 w-9 bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15")}
+                >
+                  {speaking === "tgt" ? (
+                    <VolumeX className="h-4 w-4 text-clay-500" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
+                </button>
+                <button
+                  onClick={() => void copyText(output)}
+                  disabled={!output.trim()}
+                  title="کپی ترجمه"
+                  aria-label="کپی ترجمه"
+                  className={cn(iconBtn, "h-9 w-9 bg-pine-950/5 text-pine-800 hover:bg-pine-950/10 dark:bg-white/8 dark:text-white dark:hover:bg-white/15")}
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-emerald-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div dir="auto" className="mt-2 min-h-[170px] flex-1 py-1 text-[17px] leading-9 font-medium">
+              {loading && !output ? (
+                <div className="space-y-3 pt-2">
+                  <div className="skeleton h-4 w-11/12 rounded-lg bg-pine-950/8 dark:bg-white/8" />
+                  <div className="skeleton h-4 w-3/4 rounded-lg bg-pine-950/8 dark:bg-white/8" />
+                  <div className="skeleton h-4 w-5/6 rounded-lg bg-pine-950/8 dark:bg-white/8" />
+                </div>
+              ) : output ? (
+                <p className="whitespace-pre-wrap text-ink dark:text-white">{output}</p>
+              ) : (
+                <p className="pt-1 text-ink/30 dark:text-white/30">
+                  ترجمه اینجا نمایش داده می‌شود...
+                </p>
+              )}
+            </div>
+
+            {loading && progress.total > 1 && (
+              <div className="mt-3">
+                <div className="h-1.5 overflow-hidden rounded-full bg-pine-950/8 dark:bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-l from-clay-500 to-gold-400 transition-all duration-300"
+                    style={{ width: `${(progress.done / progress.total) * 100}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-xs font-bold text-ink/45 dark:text-white/45">
+                  متن طولانی است؛ در حال ترجمه بخش {toFa(progress.done)} از {toFa(progress.total)}...
+                </p>
+              </div>
+            )}
+
+            <AnimatePresence>
+              {alternatives.length > 0 && !loading && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-3 rounded-2xl bg-cream p-3 dark:bg-white/5">
+                    <p className="px-1 text-xs font-black text-ink/45 dark:text-white/45">
+                      ترجمه‌های جایگزین (برای کپی بزن روشون):
+                    </p>
+                    <div className="mt-2 space-y-1.5">
+                      {alternatives.map((a, i) => (
+                        <button
+                          key={i}
+                          onClick={() => void copyText(a)}
+                          dir="auto"
+                          className="block w-full rounded-xl bg-white px-3 py-2 text-start text-sm font-medium leading-7 text-pine-900 shadow-sm ring-1 ring-pine-900/8 transition hover:ring-clay-500/40 dark:bg-white/8 dark:text-white dark:ring-white/10"
+                        >
+                          {a}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* action bar */}
+        <div className="flex flex-col gap-3 border-t border-pine-900/8 p-4 sm:flex-row sm:items-center dark:border-white/10">
+          <button
+            onClick={() => setAuto((v) => !v)}
+            role="switch"
+            aria-checked={auto}
+            className="flex items-center gap-2.5 text-sm font-black text-ink/70 dark:text-white/70"
+          >
+            <span className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors", auto ? "bg-emerald-500" : "bg-ink/15 dark:bg-white/15")}>
+              <span className={cn("absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all", auto ? "right-1" : "right-6")} />
+            </span>
+            ترجمه خودکار
+          </button>
+          <button
+            onClick={() => setShowEmail((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-black text-ink/70 transition hover:text-clay-600 dark:text-white/70 dark:hover:text-gold-400"
+          >
+            <Mail className="h-4 w-4" />
+            افزایش سهمیه
+            {email && <Check className="h-4 w-4 text-emerald-500" />}
+            <ChevronDown className={cn("h-4 w-4 transition-transform", showEmail && "rotate-180")} />
+          </button>
+
+          <div className="flex items-center gap-3 sm:mr-auto">
+            {loading && progress.total > 1 && (
+              <span className="hidden text-xs font-bold text-ink/45 sm:inline dark:text-white/45">
+                {toFa(progress.done)}/{toFa(progress.total)}
+              </span>
+            )}
+            <button
+              onClick={() => void doTranslate()}
+              disabled={loading || !input.trim()}
+              className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-clay-500 to-clay-600 px-7 py-3.5 text-[15px] font-black text-white shadow-xl shadow-clay-500/25 transition hover:-translate-y-0.5 hover:shadow-2xl disabled:translate-y-0 disabled:opacity-60 sm:flex-none"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  در حال ترجمه...
+                </>
+              ) : (
+                <>
+                  <Languages className="h-5 w-5" />
+                  ترجمه کن
+                  <span className="kbd hidden sm:inline">Ctrl + Enter</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* email expander */}
+        <AnimatePresence initial={false}>
+          {showEmail && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-col gap-3 border-t border-dashed border-pine-900/12 p-4 sm:flex-row sm:items-center dark:border-white/10">
+                <p className="flex-1 text-[13px] leading-7 font-medium text-ink/60 dark:text-white/60">
+                  سهمیه رایگان روزانه محدود است. با ثبت ایمیل (فقط در مرورگر تو ذخیره می‌شود)،
+                  سهمیه‌ات چند برابر می‌شود:
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={emailDraft}
+                    onChange={(e) => setEmailDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveEmail()}
+                    placeholder="you@email.com"
+                    dir="ltr"
+                    className="w-full rounded-xl border-2 border-pine-900/10 bg-cream px-4 py-2.5 text-left text-sm font-medium text-ink outline-none transition placeholder:text-ink/30 focus:border-pine-700 sm:w-56 dark:border-white/10 dark:bg-white/8 dark:text-white dark:placeholder:text-white/30 dark:focus:border-gold-400/60"
+                  />
+                  <button
+                    onClick={saveEmail}
+                    className="shrink-0 rounded-xl bg-pine-950 px-5 py-2.5 text-sm font-black text-white transition hover:bg-clay-600 dark:bg-gold-400 dark:text-pine-950 dark:hover:bg-gold-500"
+                  >
+                    ذخیره
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* stats */}
+      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {statCards.map((s) => (
+          <div
+            key={s.label}
+            className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-pine-900/8 dark:bg-white/[0.04] dark:ring-white/10"
+          >
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-pine-950/5 text-pine-800 dark:bg-white/8 dark:text-gold-400">
+              <s.icon className="h-5 w-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-xl font-black text-pine-950 dark:text-white">
+                {s.value}
+              </span>
+              <span className="block text-xs font-bold text-ink/45 dark:text-white/45">
+                {s.label}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* history */}
+      <HistoryPanel
+        items={history}
+        onRestore={restore}
+        onToggleFav={toggleFav}
+        onDelete={deleteItem}
+        onClear={clearHistory}
+        notify={notify}
+      />
+    </section>
+  );
+}
